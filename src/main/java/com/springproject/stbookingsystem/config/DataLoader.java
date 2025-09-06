@@ -2,10 +2,14 @@ package com.springproject.stbookingsystem.config;
 
 import com.springproject.stbookingsystem.entity.Performance;
 import com.springproject.stbookingsystem.entity.Seat;
+import com.springproject.stbookingsystem.entity.SeatLayout;
 import com.springproject.stbookingsystem.entity.User;
+import com.springproject.stbookingsystem.entity.Venue;
 import com.springproject.stbookingsystem.repository.PerformanceRepository;
+import com.springproject.stbookingsystem.repository.SeatLayoutRepository;
 import com.springproject.stbookingsystem.repository.SeatRepository;
 import com.springproject.stbookingsystem.repository.UserRepository;
+import com.springproject.stbookingsystem.repository.VenueRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -13,6 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Slf4j
 @Component
@@ -20,6 +25,8 @@ import java.time.LocalDateTime;
 public class DataLoader implements CommandLineRunner {
 
     private final UserRepository userRepository;
+    private final VenueRepository venueRepository;
+    private final SeatLayoutRepository seatLayoutRepository;
     private final PerformanceRepository performanceRepository;
     private final SeatRepository seatRepository;
     private final PasswordEncoder passwordEncoder;
@@ -39,6 +46,9 @@ public class DataLoader implements CommandLineRunner {
 
         // 테스트 사용자 계정 생성
         createTestUsers();
+
+        // 공연장 생성
+        createSampleVenues();
 
         // 샘플 공연 생성
         createSamplePerformances();
@@ -84,81 +94,192 @@ public class DataLoader implements CommandLineRunner {
         log.info("테스트 사용자 계정이 생성되었습니다.");
     }
 
+    private void createSampleVenues() {
+        log.info("샘플 공연장 생성 중...");
+
+        // 세종문화회관 대극장
+        Venue sejongTheater = Venue.builder()
+                .name("세종문화회관 대극장")
+                .location("서울특별시 종로구 세종대로 175")
+                .description("국내 최고의 공연장 중 하나로, 다양한 클래식 음악회와 오페라가 열립니다.")
+                .totalSeats(3000)
+                .totalRows(30)
+                .seatsPerRow(100)
+                .facilities("주차장, 레스토랑, VIP라운지")
+                .contactInfo("02-399-1000")
+                .build();
+        venueRepository.save(sejongTheater);
+
+        // 블루스퀘어 삼성전자홀
+        Venue blueSquare = Venue.builder()
+                .name("블루스퀘어 삼성전자홀")
+                .location("서울특별시 용산구 이태원로 294")
+                .description("뮤지컬과 연극 공연의 메카로 불리는 현대적인 공연장입니다.")
+                .totalSeats(1800)
+                .totalRows(20)
+                .seatsPerRow(90)
+                .facilities("주차장, 카페, 기념품샵")
+                .contactInfo("1588-5212")
+                .build();
+        venueRepository.save(blueSquare);
+
+        // 예술의전당 콘서트홀
+        Venue sacConcertHall = Venue.builder()
+                .name("예술의전당 콘서트홀")
+                .location("서울특별시 서초구 남부순환로 2406")
+                .description("최고 수준의 음향시설을 갖춘 클래식 전용 공연장입니다.")
+                .totalSeats(2600)
+                .totalRows(26)
+                .seatsPerRow(100)
+                .facilities("주차장, 레스토랑, 아트샵")
+                .contactInfo("02-580-1300")
+                .build();
+        venueRepository.save(sacConcertHall);
+
+        // 각 공연장에 기본 좌석 배치 생성
+        createSampleSeatLayouts(sejongTheater);
+        createSampleSeatLayouts(blueSquare);
+        createSampleSeatLayouts(sacConcertHall);
+
+        log.info("샘플 공연장 생성 완료");
+    }
+
+    private void createSampleSeatLayouts(Venue venue) {
+        log.info("공연장 '{}' 좌석 배치 생성 중...", venue.getName());
+
+        for (int row = 1; row <= Math.min(venue.getTotalRows(), 10); row++) { // 처음 10행만 생성
+            for (int seat = 1; seat <= Math.min(venue.getSeatsPerRow(), 20); seat++) { // 행당 20석만 생성
+                SeatLayout.SeatType seatType;
+                
+                // 좌석 타입 결정
+                if (row <= 3) {
+                    seatType = SeatLayout.SeatType.VIP; // 앞 3행은 VIP
+                } else if (row <= 6) {
+                    seatType = SeatLayout.SeatType.PREMIUM; // 4-6행은 프리미엄
+                } else {
+                    seatType = SeatLayout.SeatType.REGULAR; // 나머지는 일반
+                }
+
+                // 통로 처리 (중간에 통로 생성)
+                if (seat == 6 || seat == 15) {
+                    seatType = SeatLayout.SeatType.AISLE;
+                }
+
+                SeatLayout seatLayout = SeatLayout.builder()
+                        .venue(venue)
+                        .rowNumber(row)
+                        .seatNumber(seat)
+                        .seatType(seatType)
+                        .isActive(true)
+                        .xPosition(seat * 40) // UI 좌표
+                        .yPosition(row * 50)
+                        .build();
+
+                seatLayout.generateSeatLabel();
+                seatLayoutRepository.save(seatLayout);
+            }
+        }
+    }
+
     private void createSamplePerformances() {
-        // 뮤지컬 공연
-        Performance musical = Performance.builder()
-                .title("레미제라블")
-                .venue("예술의전당 오페라극장")
+        log.info("샘플 공연 생성 중...");
+
+        List<Venue> venues = venueRepository.findAll();
+        if (venues.isEmpty()) {
+            log.warn("공연장이 없어 샘플 공연을 생성할 수 없습니다");
+            return;
+        }
+
+        Venue venue1 = venues.get(0);
+        Venue venue2 = venues.size() > 1 ? venues.get(1) : venue1;
+        Venue venue3 = venues.size() > 2 ? venues.get(2) : venue1;
+
+        Performance performance1 = Performance.builder()
+                .title("베토벤 교향곡 9번 '합창'")
+                .venue(venue1)
+                .venueName(venue1.getName())
                 .performanceDate(LocalDateTime.now().plusDays(30))
-                .price(150000)
-                .totalSeats(100)
-                .description("빅토르 위고의 대작을 바탕으로 한 감동적인 뮤지컬")
-                .imageUrl("https://images.unsplash.com/photo-1507924538820-ede94a04019d?w=400&h=600&fit=crop")
-                .build();
-        
-        performanceRepository.save(musical);
-        createSeatsForPerformance(musical);
-
-        // 콘서트 공연
-        Performance concert = Performance.builder()
-                .title("BTS 월드 투어")
-                .venue("잠실 올림픽 주경기장")
-                .performanceDate(LocalDateTime.now().plusDays(45))
-                .price(250000)
-                .totalSeats(200)
-                .description("전 세계를 뜨겁게 달군 BTS의 콘서트")
-                .imageUrl("https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=600&fit=crop")
-                .build();
-        
-        performanceRepository.save(concert);
-        createSeatsForPerformance(concert);
-
-        // 연극 공연
-        Performance play = Performance.builder()
-                .title("햄릿")
-                .venue("국립극장 해오름극장")
-                .performanceDate(LocalDateTime.now().plusDays(20))
                 .price(80000)
-                .totalSeats(80)
-                .description("셰익스피어의 불멸의 작품 햄릿")
-                .imageUrl("https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=400&h=600&fit=crop")
+                .totalSeats(200) // 실제 생성된 좌석 수에 맞춤
+                .description("서울시립교향악단과 함께하는 베토벤의 대표작")
+                .imageUrl("/images/beethoven9.jpg")
                 .build();
-        
-        performanceRepository.save(play);
-        createSeatsForPerformance(play);
+        performanceRepository.save(performance1);
 
-        // 클래식 공연
-        Performance classic = Performance.builder()
-                .title("베토벤 교향곡 9번")
-                .venue("세종문화회관 대극장")
-                .performanceDate(LocalDateTime.now().plusDays(60))
+        Performance performance2 = Performance.builder()
+                .title("뮤지컬 '레미제라블'")
+                .venue(venue2)
+                .venueName(venue2.getName())
+                .performanceDate(LocalDateTime.now().plusDays(45))
                 .price(120000)
-                .totalSeats(150)
-                .description("서울시향과 함께하는 베토벤의 합창 교향곡")
-                .imageUrl("https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=600&fit=crop")
+                .totalSeats(200)
+                .description("감동의 뮤지컬 레미제라블 내한공연")
+                .imageUrl("/images/lesmiserables.jpg")
                 .build();
-        
-        performanceRepository.save(classic);
-        createSeatsForPerformance(classic);
+        performanceRepository.save(performance2);
 
-        log.info("샘플 공연 데이터가 생성되었습니다.");
+        Performance performance3 = Performance.builder()
+                .title("발레 '백조의 호수'")
+                .venue(venue3)
+                .venueName(venue3.getName())
+                .performanceDate(LocalDateTime.now().plusDays(60))
+                .price(90000)
+                .totalSeats(200)
+                .description("국립발레단의 아름다운 백조의 호수")
+                .imageUrl("/images/swanlake.jpg")
+                .build();
+        performanceRepository.save(performance3);
+
+        // 각 공연에 좌석 생성
+        createSeatsForPerformance(performance1);
+        createSeatsForPerformance(performance2);
+        createSeatsForPerformance(performance3);
+
+        log.info("샘플 공연 생성 완료");
     }
 
     private void createSeatsForPerformance(Performance performance) {
-        int totalSeats = performance.getTotalSeats();
-        int seatsPerRow = 10; // 한 행당 10석
+        Venue venue = performance.getVenue();
+        if (venue == null) {
+            log.warn("공연 '{}'에 연결된 공연장이 없습니다", performance.getTitle());
+            return;
+        }
 
-        for (int i = 1; i <= totalSeats; i++) {
-            char row = (char) ('A' + (i - 1) / seatsPerRow);
-            int seatNumber = ((i - 1) % seatsPerRow) + 1;
-            String seatName = row + String.valueOf(seatNumber);
+        // 공연장의 좌석 배치 기준으로 좌석 생성
+        List<SeatLayout> seatLayouts = seatLayoutRepository.findByVenueAndIsActiveTrueOrderByRowNumberAscSeatNumberAsc(venue);
+        
+        if (!seatLayouts.isEmpty()) {
+            // 공연장의 좌석 배치가 있는 경우
+            for (SeatLayout seatLayout : seatLayouts) {
+                if (seatLayout.isBookable()) {
+                    Seat seat = Seat.builder()
+                            .performance(performance)
+                            .seatNumber(seatLayout.getSeatLabel())
+                            .rowNumber(seatLayout.getRowNumber())
+                            .seatInRow(seatLayout.getSeatNumber())
+                            .seatLayout(seatLayout)
+                            .build();
+                    seatRepository.save(seat);
+                }
+            }
+        } else {
+            // 기본 좌석 구조로 생성
+            int totalSeats = performance.getTotalSeats();
+            int seatsPerRow = Math.min(venue.getSeatsPerRow(), 20); // 최대 20석
 
-            Seat seat = Seat.builder()
-                    .performance(performance)
-                    .seatNumber(seatName)
-                    .build();
-            
-            seatRepository.save(seat);
+            for (int i = 1; i <= totalSeats; i++) {
+                int row = ((i - 1) / seatsPerRow) + 1;
+                int seatInRow = ((i - 1) % seatsPerRow) + 1;
+                String seatName = venue.generateSeatNumber(row, seatInRow);
+
+                Seat seat = Seat.builder()
+                        .performance(performance)
+                        .seatNumber(seatName)
+                        .rowNumber(row)
+                        .seatInRow(seatInRow)
+                        .build();
+                seatRepository.save(seat);
+            }
         }
     }
 
