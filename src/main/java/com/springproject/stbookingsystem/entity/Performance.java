@@ -17,7 +17,8 @@ import java.util.List;
     indexes = {
         @Index(name = "idx_performance_date", columnList = "performance_date"),
         @Index(name = "idx_performance_title", columnList = "title"),
-        @Index(name = "idx_performance_venue", columnList = "venue"),
+        @Index(name = "idx_performance_venue", columnList = "venue_id"),
+        @Index(name = "idx_performance_venue_name", columnList = "venue_name"),
         @Index(name = "idx_performance_price", columnList = "price"),
         @Index(name = "idx_performance_created_at", columnList = "created_at")
     }
@@ -40,9 +41,13 @@ public class Performance {
     @Column(name = "title", nullable = false, length = 200)
     private String title;
 
-    @NotBlank(message = "공연장은 필수입니다")
-    @Column(name = "venue", nullable = false, length = 100)
-    private String venue;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "venue_id", foreignKey = @ForeignKey(name = "fk_performance_venue"))
+    private Venue venue;
+
+    @NotBlank(message = "공연장명은 필수입니다")
+    @Column(name = "venue_name", nullable = false, length = 100)
+    private String venueName;
 
     @NotNull(message = "공연 일시는 필수입니다")
     @Column(name = "performance_date", nullable = false)

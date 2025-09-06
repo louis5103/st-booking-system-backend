@@ -88,7 +88,7 @@ public class BookingDTO {
             return PerformanceInfo.builder()
                     .id(performance.getId())
                     .title(performance.getTitle())
-                    .venue(performance.getVenue())
+                    .venue(performance.getVenue() != null ? performance.getVenue().getName() : performance.getVenueName())
                     .performanceDate(performance.getPerformanceDate())
                     .price(performance.getPrice())
                     .imageUrl(performance.getImageUrl())
