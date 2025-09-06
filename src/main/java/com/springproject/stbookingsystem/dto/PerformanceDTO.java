@@ -24,8 +24,10 @@ public class PerformanceDTO {
         @NotBlank(message = "공연명은 필수입니다")
         private String title;
 
-        @NotBlank(message = "공연장은 필수입니다")
-        private String venue;
+        @NotNull(message = "공연장 ID는 필수입니다")
+        private Long venueId;
+
+        private String venueName; // 응답용 (선택사항)
 
         @NotNull(message = "공연 일시는 필수입니다")
         private LocalDateTime performanceDate;
@@ -51,7 +53,8 @@ public class PerformanceDTO {
     public static class PerformanceResponse {
         private Long id;
         private String title;
-        private String venue;
+        private Long venueId;
+        private String venueName;
         private LocalDateTime performanceDate;
         private Integer price;
         private Integer totalSeats;
@@ -66,7 +69,8 @@ public class PerformanceDTO {
             return PerformanceResponse.builder()
                     .id(performance.getId())
                     .title(performance.getTitle())
-                    .venue(performance.getVenue())
+                    .venueId(performance.getVenue() != null ? performance.getVenue().getId() : null)
+                    .venueName(performance.getVenueName())
                     .performanceDate(performance.getPerformanceDate())
                     .price(performance.getPrice())
                     .totalSeats(performance.getTotalSeats())
