@@ -18,7 +18,9 @@ import java.time.LocalDateTime;
         @Index(name = "idx_seat_performance", columnList = "performance_id"),
         @Index(name = "idx_seat_number", columnList = "seat_number"),
         @Index(name = "idx_seat_booked", columnList = "is_booked"),
-        @Index(name = "idx_seat_performance_booked", columnList = "performance_id, is_booked")
+        @Index(name = "idx_seat_performance_booked", columnList = "performance_id, is_booked"),
+        @Index(name = "idx_seat_position", columnList = "row_number, seat_in_row"),
+        @Index(name = "idx_seat_layout", columnList = "seat_layout_id")
     }
 )
 @Getter
@@ -44,6 +46,16 @@ public class Seat {
     @NotBlank(message = "좌석 번호는 필수입니다")
     @Column(name = "seat_number", nullable = false, length = 10)
     private String seatNumber;
+
+    @Column(name = "row_number")
+    private Integer rowNumber;
+
+    @Column(name = "seat_in_row")
+    private Integer seatInRow;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "seat_layout_id", foreignKey = @ForeignKey(name = "fk_seat_layout"))
+    private SeatLayout seatLayout;
 
     @Column(name = "is_booked", nullable = false)
     @Builder.Default
