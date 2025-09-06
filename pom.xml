@@ -9,9 +9,8 @@
         <relativePath/>
     </parent>
     <groupId>com.st</groupId>
-    <artifactId>booking-system</artifactId>
+    <artifactId>st-booking-system-backend</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>st-booking-system</name>
     <description>ST 통합예매관리시스템</description>
 
     <properties>
