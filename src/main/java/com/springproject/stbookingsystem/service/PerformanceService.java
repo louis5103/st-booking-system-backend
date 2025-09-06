@@ -1,12 +1,11 @@
-package com.springproject.stbookingsystem.sevice;
-
+package com.springproject.stbookingsystem.service;
 
 import com.springproject.stbookingsystem.dto.PerformanceDTO;
 import com.springproject.stbookingsystem.entity.Performance;
 import com.springproject.stbookingsystem.entity.Seat;
 import com.springproject.stbookingsystem.repository.PerformanceRepository;
 import com.springproject.stbookingsystem.repository.SeatRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,17 +14,16 @@ import java.util.stream.Collectors;
 
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class PerformanceService {
 
-    @Autowired
-    private PerformanceRepository performanceRepository;
-
-    @Autowired
-    private SeatRepository seatRepository;
+    private final PerformanceRepository performanceRepository;
+    private final SeatRepository seatRepository;
 
     /**
      * 모든 공연 조회
      */
+    @Transactional(readOnly = true)
     public List<PerformanceDTO.PerformanceResponse> getAllPerformances() {
         return performanceRepository.findAllByOrderByPerformanceDateAsc()
                 .stream()
@@ -36,6 +34,7 @@ public class PerformanceService {
     /**
      * 공연 ID로 조회
      */
+    @Transactional(readOnly = true)
     public PerformanceDTO.PerformanceResponse getPerformanceById(Long id) {
         Performance performance = performanceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("공연을 찾을 수 없습니다"));
@@ -46,15 +45,15 @@ public class PerformanceService {
      * 공연 등록
      */
     public PerformanceDTO.PerformanceResponse createPerformance(PerformanceDTO.PerformanceRequest request) {
-        Performance performance = new Performance(
-                request.getTitle(),
-                request.getVenue(),
-                request.getPerformanceDate(),
-                request.getPrice(),
-                request.getTotalSeats()
-        );
-        performance.setDescription(request.getDescription());
-        performance.setImageUrl(request.getImageUrl());
+        Performance performance = Performance.builder()
+                .title(request.getTitle())
+                .venue(request.getVenue())
+                .performanceDate(request.getPerformanceDate())
+                .price(request.getPrice())
+                .totalSeats(request.getTotalSeats())
+                .description(request.getDescription())
+                .imageUrl(request.getImageUrl())
+                .build();
 
         Performance savedPerformance = performanceRepository.save(performance);
 
@@ -115,6 +114,7 @@ public class PerformanceService {
     /**
      * 공연 검색 (제목 또는 장소)
      */
+    @Transactional(readOnly = true)
     public List<PerformanceDTO.PerformanceResponse> searchPerformances(String keyword) {
         return performanceRepository.findByTitleOrVenueContaining(keyword)
                 .stream()
@@ -134,7 +134,10 @@ public class PerformanceService {
             int seatNumber = ((i - 1) % seatsPerRow) + 1;
             String seatName = row + String.valueOf(seatNumber);
 
-            Seat seat = new Seat(performance, seatName);
+            Seat seat = Seat.builder()
+                    .performance(performance)
+                    .seatNumber(seatName)
+                    .build();
             seatRepository.save(seat);
         }
     }
@@ -152,7 +155,6 @@ public class PerformanceService {
         seatRepository.deleteAll(unbookedSeats);
 
         // 현재 예매된 좌석 수
-        Long bookedCount = seatRepository.countBookedSeatsByPerformanceId(performance.getId());
         int currentSeatCount = existingSeats.size() - unbookedSeats.size();
 
         // 필요한 만큼 새 좌석 추가
@@ -168,7 +170,10 @@ public class PerformanceService {
                 int seatNumber = ((seatIndex - 1) % seatsPerRow) + 1;
                 String seatName = row + String.valueOf(seatNumber);
 
-                Seat seat = new Seat(performance, seatName);
+                Seat seat = Seat.builder()
+                        .performance(performance)
+                        .seatNumber(seatName)
+                        .build();
                 seatRepository.save(seat);
             }
         }

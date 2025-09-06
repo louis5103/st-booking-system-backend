@@ -1,7 +1,7 @@
 package com.springproject.stbookingsystem.controller;
 
 import com.springproject.stbookingsystem.dto.AuthDTO;
-import com.springproject.stbookingsystem.sevice.AuthService;
+import com.springproject.stbookingsystem.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

@@ -2,7 +2,7 @@ package com.springproject.stbookingsystem.controller;
 
 
 import com.springproject.stbookingsystem.dto.SeatDTO;
-import com.springproject.stbookingsystem.sevice.SeatService;
+import com.springproject.stbookingsystem.service.SeatService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;

@@ -1,12 +1,13 @@
-package com.springproject.stbookingsystem.sevice;
-
+package com.springproject.stbookingsystem.service;
 
 import com.springproject.stbookingsystem.dto.SeatDTO;
 import com.springproject.stbookingsystem.entity.Performance;
 import com.springproject.stbookingsystem.entity.Seat;
 import com.springproject.stbookingsystem.repository.PerformanceRepository;
 import com.springproject.stbookingsystem.repository.SeatRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.Getter;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,13 +16,11 @@ import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class SeatService {
 
-    @Autowired
-    private SeatRepository seatRepository;
-
-    @Autowired
-    private PerformanceRepository performanceRepository;
+    private final SeatRepository seatRepository;
+    private final PerformanceRepository performanceRepository;
 
     /**
      * 특정 공연의 모든 좌석 조회
@@ -99,29 +98,12 @@ public class SeatService {
     /**
      * 좌석 통계를 위한 내부 클래스
      */
+    @Getter
+    @AllArgsConstructor
     public static class SeatStatistics {
-        private Long totalSeats;
-        private Long bookedSeats;
-        private Long availableSeats;
-
-        public SeatStatistics(Long totalSeats, Long bookedSeats, Long availableSeats) {
-            this.totalSeats = totalSeats;
-            this.bookedSeats = bookedSeats;
-            this.availableSeats = availableSeats;
-        }
-
-        // Getters
-        public Long getTotalSeats() {
-            return totalSeats;
-        }
-
-        public Long getBookedSeats() {
-            return bookedSeats;
-        }
-
-        public Long getAvailableSeats() {
-            return availableSeats;
-        }
+        private final Long totalSeats;
+        private final Long bookedSeats;
+        private final Long availableSeats;
 
         public double getBookingRate() {
             if (totalSeats == 0) return 0.0;

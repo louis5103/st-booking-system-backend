@@ -1,187 +1,163 @@
 package com.springproject.stbookingsystem.exception;
 
-
+import com.springproject.stbookingsystem.common.ApiResponse;
+import com.springproject.stbookingsystem.exception.custom.BusinessException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     /**
-     * 일반적인 런타임 예외 처리
+     * 비즈니스 로직 예외 처리
      */
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<ErrorResponse> handleRuntimeException(
-            RuntimeException ex, WebRequest request) {
-
-        ErrorResponse errorResponse = new ErrorResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                ex.getMessage(),
-                request.getDescription(false).replace("uri=", ""),
-                LocalDateTime.now()
-        );
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBusinessException(
+            BusinessException ex, WebRequest request) {
+        
+        log.warn("Business exception occurred: {} - {}", ex.getErrorCode(), ex.getMessage());
+        
+        ApiResponse<Void> response = ApiResponse.error(ex.getErrorCode(), ex.getMessage());
+        return ResponseEntity.badRequest().body(response);
     }
 
     /**
-     * 유효성 검사 실패 예외 처리
+     * 유효성 검증 실패 예외 처리
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ValidationErrorResponse> handleValidationExceptions(
-            MethodArgumentNotValidException ex, WebRequest request) {
-
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationException(
+            MethodArgumentNotValidException ex) {
+        
+        log.warn("Validation failed: {}", ex.getMessage());
+        
         Map<String, String> errors = new HashMap<>();
-        ex.getBindingResult().getAllErrors().forEach((error) -> {
+        ex.getBindingResult().getAllErrors().forEach(error -> {
             String fieldName = ((FieldError) error).getField();
             String errorMessage = error.getDefaultMessage();
             errors.put(fieldName, errorMessage);
         });
 
-        ValidationErrorResponse errorResponse = new ValidationErrorResponse(
-                HttpStatus.BAD_REQUEST.value(),
-                "입력값 검증에 실패했습니다",
-                request.getDescription(false).replace("uri=", ""),
-                LocalDateTime.now(),
+        ApiResponse<Map<String, String>> response = ApiResponse.error(
+                "VALIDATION_FAILED", 
+                "입력값 검증에 실패했습니다", 
                 errors
         );
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+        
+        return ResponseEntity.badRequest().body(response);
     }
 
     /**
      * 인증 실패 예외 처리
      */
-    @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<ErrorResponse> handleBadCredentialsException(
-            BadCredentialsException ex, WebRequest request) {
-
-        ErrorResponse errorResponse = new ErrorResponse(
-                HttpStatus.UNAUTHORIZED.value(),
-                "이메일 또는 비밀번호가 올바르지 않습니다",
-                request.getDescription(false).replace("uri=", ""),
-                LocalDateTime.now()
+    @ExceptionHandler({AuthenticationException.class, BadCredentialsException.class})
+    public ResponseEntity<ApiResponse<Void>> handleAuthenticationException(
+            AuthenticationException ex) {
+        
+        log.warn("Authentication failed: {}", ex.getMessage());
+        
+        ApiResponse<Void> response = ApiResponse.error(
+                "AUTHENTICATION_FAILED", 
+                "인증에 실패했습니다"
         );
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
+        
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
 
     /**
-     * 접근 권한 없음 예외 처리
+     * 권한 부족 예외 처리
      */
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDeniedException(
-            AccessDeniedException ex, WebRequest request) {
-
-        ErrorResponse errorResponse = new ErrorResponse(
-                HttpStatus.FORBIDDEN.value(),
-                "접근 권한이 없습니다",
-                request.getDescription(false).replace("uri=", ""),
-                LocalDateTime.now()
+    public ResponseEntity<ApiResponse<Void>> handleAccessDeniedException(
+            AccessDeniedException ex) {
+        
+        log.warn("Access denied: {}", ex.getMessage());
+        
+        ApiResponse<Void> response = ApiResponse.error(
+                "ACCESS_DENIED", 
+                "접근 권한이 없습니다"
         );
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
+        
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 
     /**
-     * 기타 모든 예외 처리
+     * IllegalArgumentException 처리
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(
+            IllegalArgumentException ex) {
+        
+        log.warn("Illegal argument: {}", ex.getMessage());
+        
+        ApiResponse<Void> response = ApiResponse.error(
+                "INVALID_ARGUMENT", 
+                ex.getMessage()
+        );
+        
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    /**
+     * IllegalStateException 처리
+     */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalStateException(
+            IllegalStateException ex) {
+        
+        log.warn("Illegal state: {}", ex.getMessage());
+        
+        ApiResponse<Void> response = ApiResponse.error(
+                "INVALID_STATE", 
+                ex.getMessage()
+        );
+        
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    /**
+     * 일반적인 RuntimeException 처리
+     */
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRuntimeException(
+            RuntimeException ex, WebRequest request) {
+        
+        log.error("Runtime exception occurred: {}", ex.getMessage(), ex);
+        
+        ApiResponse<Void> response = ApiResponse.error(
+                "RUNTIME_ERROR", 
+                "요청 처리 중 오류가 발생했습니다"
+        );
+        
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+    }
+
+    /**
+     * 모든 예외의 최종 처리
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGlobalException(
+    public ResponseEntity<ApiResponse<Void>> handleGlobalException(
             Exception ex, WebRequest request) {
-
-        ErrorResponse errorResponse = new ErrorResponse(
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "서버 내부 오류가 발생했습니다: " + ex.getMessage(),
-                request.getDescription(false).replace("uri=", ""),
-                LocalDateTime.now()
+        
+        log.error("Unexpected exception occurred: {}", ex.getMessage(), ex);
+        
+        ApiResponse<Void> response = ApiResponse.error(
+                "INTERNAL_SERVER_ERROR", 
+                "서버 내부 오류가 발생했습니다"
         );
-
-        // 개발 환경에서는 스택 트레이스 출력
-        ex.printStackTrace();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-
-    /**
-     * 기본 에러 응답 클래스
-     */
-    public static class ErrorResponse {
-        private int status;
-        private String message;
-        private String path;
-        private LocalDateTime timestamp;
-
-        public ErrorResponse(int status, String message, String path, LocalDateTime timestamp) {
-            this.status = status;
-            this.message = message;
-            this.path = path;
-            this.timestamp = timestamp;
-        }
-
-        // Getters and Setters
-        public int getStatus() {
-            return status;
-        }
-
-        public void setStatus(int status) {
-            this.status = status;
-        }
-
-        public String getMessage() {
-            return message;
-        }
-
-        public void setMessage(String message) {
-            this.message = message;
-        }
-
-        public String getPath() {
-            return path;
-        }
-
-        public void setPath(String path) {
-            this.path = path;
-        }
-
-        public LocalDateTime getTimestamp() {
-            return timestamp;
-        }
-
-        public void setTimestamp(LocalDateTime timestamp) {
-            this.timestamp = timestamp;
-        }
-    }
-
-    /**
-     * 유효성 검사 에러 응답 클래스
-     */
-    public static class ValidationErrorResponse extends ErrorResponse {
-        private Map<String, String> fieldErrors;
-
-        public ValidationErrorResponse(int status, String message, String path,
-                                       LocalDateTime timestamp, Map<String, String> fieldErrors) {
-            super(status, message, path, timestamp);
-            this.fieldErrors = fieldErrors;
-        }
-
-        public Map<String, String> getFieldErrors() {
-            return fieldErrors;
-        }
-
-        public void setFieldErrors(Map<String, String> fieldErrors) {
-            this.fieldErrors = fieldErrors;
-        }
+        
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }

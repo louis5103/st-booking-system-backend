@@ -3,125 +3,116 @@ package com.springproject.stbookingsystem.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "seats", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"performance_id", "seat_number"})
-})
+@Table(name = "seats",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_seat_performance_number", columnNames = {"performance_id", "seat_number"})
+    },
+    indexes = {
+        @Index(name = "idx_seat_performance", columnList = "performance_id"),
+        @Index(name = "idx_seat_number", columnList = "seat_number"),
+        @Index(name = "idx_seat_booked", columnList = "is_booked"),
+        @Index(name = "idx_seat_performance_booked", columnList = "performance_id, is_booked")
+    }
+)
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@ToString(exclude = {"performance", "booking"})
+@EqualsAndHashCode(of = "id")
 public class Seat {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
     private Long id;
 
     @NotNull(message = "공연 정보는 필수입니다")
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "performance_id", nullable = false)
+    @JoinColumn(name = "performance_id", nullable = false, 
+                foreignKey = @ForeignKey(name = "fk_seat_performance"))
     private Performance performance;
 
     @NotBlank(message = "좌석 번호는 필수입니다")
-    @Column(name = "seat_number", nullable = false)
+    @Column(name = "seat_number", nullable = false, length = 10)
     private String seatNumber;
 
     @Column(name = "is_booked", nullable = false)
+    @Builder.Default
     private Boolean isBooked = false;
 
-    @Column(name = "created_at")
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @OneToOne(mappedBy = "seat", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToOne(mappedBy = "seat", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     private Booking booking;
 
-    // 기본 생성자
-    public Seat() {}
-
-    // 생성자
-    public Seat(Performance performance, String seatNumber) {
-        this.performance = performance;
-        this.seatNumber = seatNumber;
-        this.isBooked = false;
-    }
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
-
-    // 좌석 예매 처리
+    // 비즈니스 로직 메소드들
+    
+    /**
+     * 좌석 예매 처리
+     */
     public void book() {
+        if (this.isBooked) {
+            throw new IllegalStateException("이미 예매된 좌석입니다: " + this.seatNumber);
+        }
         this.isBooked = true;
     }
 
-    // 좌석 예매 취소 처리
+    /**
+     * 좌석 예매 취소 처리
+     */
     public void cancel() {
+        if (!this.isBooked) {
+            throw new IllegalStateException("예매되지 않은 좌석입니다: " + this.seatNumber);
+        }
         this.isBooked = false;
     }
-
-    // Getters and Setters
-    public Long getId() {
-        return id;
+    
+    /**
+     * 좌석이 예매 가능한지 확인
+     */
+    public boolean isAvailable() {
+        return !this.isBooked;
     }
-
-    public void setId(Long id) {
-        this.id = id;
+    
+    /**
+     * 좌석의 행 정보 추출 (A1 -> A)
+     */
+    public String getRowInfo() {
+        if (seatNumber == null || seatNumber.isEmpty()) {
+            return "";
+        }
+        return seatNumber.replaceAll("\\d", "");
     }
-
-    public Performance getPerformance() {
-        return performance;
+    
+    /**
+     * 좌석의 번호 정보 추출 (A1 -> 1)
+     */
+    public String getNumberInfo() {
+        if (seatNumber == null || seatNumber.isEmpty()) {
+            return "";
+        }
+        return seatNumber.replaceAll("[A-Za-z]", "");
     }
-
-    public void setPerformance(Performance performance) {
-        this.performance = performance;
-    }
-
-    public String getSeatNumber() {
-        return seatNumber;
-    }
-
-    public void setSeatNumber(String seatNumber) {
-        this.seatNumber = seatNumber;
-    }
-
-    public Boolean getIsBooked() {
-        return isBooked;
-    }
-
-    public void setIsBooked(Boolean isBooked) {
-        this.isBooked = isBooked;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
-    public Booking getBooking() {
-        return booking;
-    }
-
-    public void setBooking(Booking booking) {
-        this.booking = booking;
+    
+    /**
+     * 좌석 상태 문자열 반환
+     */
+    public String getStatusText() {
+        return isBooked ? "예매완료" : "예매가능";
     }
 }

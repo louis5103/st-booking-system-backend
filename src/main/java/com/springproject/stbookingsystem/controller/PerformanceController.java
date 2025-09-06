@@ -2,7 +2,7 @@ package com.springproject.stbookingsystem.controller;
 
 
 import com.springproject.stbookingsystem.dto.PerformanceDTO;
-import com.springproject.stbookingsystem.sevice.PerformanceService;
+import com.springproject.stbookingsystem.service.PerformanceService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

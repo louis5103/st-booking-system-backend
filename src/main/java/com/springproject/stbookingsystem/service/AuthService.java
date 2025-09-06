@@ -1,11 +1,10 @@
-package com.springproject.stbookingsystem.sevice;
-
+package com.springproject.stbookingsystem.service;
 
 import com.springproject.stbookingsystem.dto.AuthDTO;
 import com.springproject.stbookingsystem.entity.User;
 import com.springproject.stbookingsystem.repository.UserRepository;
 import com.springproject.stbookingsystem.security.JwtUtils;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -16,19 +15,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class AuthService {
 
-    @Autowired
-    private AuthenticationManager authenticationManager;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private JwtUtils jwtUtils;
+    private final AuthenticationManager authenticationManager;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtUtils jwtUtils;
 
     /**
      * 로그인 처리
@@ -70,13 +63,13 @@ public class AuthService {
         }
 
         // 새 사용자 생성
-        User user = new User(
-                registerRequest.getEmail(),
-                passwordEncoder.encode(registerRequest.getPassword()),
-                registerRequest.getName(),
-                registerRequest.getPhone(),
-                User.Role.valueOf(registerRequest.getRole())
-        );
+        User user = User.builder()
+                .email(registerRequest.getEmail())
+                .password(passwordEncoder.encode(registerRequest.getPassword()))
+                .name(registerRequest.getName())
+                .phone(registerRequest.getPhone())
+                .role(User.Role.valueOf(registerRequest.getRole()))
+                .build();
 
         User savedUser = userRepository.save(user);
 

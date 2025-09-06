@@ -1,5 +1,4 @@
-package com.springproject.stbookingsystem.sevice;
-
+package com.springproject.stbookingsystem.service;
 
 import com.springproject.stbookingsystem.dto.BookingDTO;
 import com.springproject.stbookingsystem.entity.Booking;
@@ -9,7 +8,9 @@ import com.springproject.stbookingsystem.entity.User;
 import com.springproject.stbookingsystem.repository.BookingRepository;
 import com.springproject.stbookingsystem.repository.PerformanceRepository;
 import com.springproject.stbookingsystem.repository.SeatRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.Getter;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,19 +20,13 @@ import java.util.stream.Collectors;
 
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class BookingService {
 
-    @Autowired
-    private BookingRepository bookingRepository;
-
-    @Autowired
-    private PerformanceRepository performanceRepository;
-
-    @Autowired
-    private SeatRepository seatRepository;
-
-    @Autowired
-    private AuthService authService;
+    private final BookingRepository bookingRepository;
+    private final PerformanceRepository performanceRepository;
+    private final SeatRepository seatRepository;
+    private final AuthService authService;
 
     /**
      * 예매 생성
@@ -77,7 +72,12 @@ public class BookingService {
         seatRepository.save(seat);
 
         // 예매 정보 생성
-        Booking booking = new Booking(currentUser, performance, seat);
+        Booking booking = Booking.builder()
+                .user(currentUser)
+                .performance(performance)
+                .seat(seat)
+                .build();
+        
         Booking savedBooking = bookingRepository.save(booking);
 
         return BookingDTO.BookingResponse.from(savedBooking);
@@ -194,36 +194,13 @@ public class BookingService {
     /**
      * 예매 통계를 위한 내부 클래스
      */
+    @Getter
+    @AllArgsConstructor
     public static class BookingStatistics {
-        private Long totalBookings;
-        private Long totalRevenue;
-        private Integer availableSeats;
-        private Integer ticketPrice;
-
-        public BookingStatistics(Long totalBookings, Long totalRevenue,
-                                 Integer availableSeats, Integer ticketPrice) {
-            this.totalBookings = totalBookings;
-            this.totalRevenue = totalRevenue;
-            this.availableSeats = availableSeats;
-            this.ticketPrice = ticketPrice;
-        }
-
-        // Getters
-        public Long getTotalBookings() {
-            return totalBookings;
-        }
-
-        public Long getTotalRevenue() {
-            return totalRevenue;
-        }
-
-        public Integer getAvailableSeats() {
-            return availableSeats;
-        }
-
-        public Integer getTicketPrice() {
-            return ticketPrice;
-        }
+        private final Long totalBookings;
+        private final Long totalRevenue;
+        private final Integer availableSeats;
+        private final Integer ticketPrice;
 
         public Long getExpectedRevenue() {
             return totalRevenue + (availableSeats * ticketPrice);
