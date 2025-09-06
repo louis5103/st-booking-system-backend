@@ -62,17 +62,17 @@ public class ApiResponse<T> {
     public static <T> ApiResponse<T> error(String errorCode, String message) {
         return ApiResponse.<T>builder()
                 .success(false)
-                .errorCode(errorCode)
                 .message(message)
+                .errorCode(errorCode)
                 .build();
     }
     
     public static <T> ApiResponse<T> error(String errorCode, String message, T data) {
         return ApiResponse.<T>builder()
                 .success(false)
-                .errorCode(errorCode)
                 .message(message)
                 .data(data)
+                .errorCode(errorCode)
                 .build();
     }
 }

@@ -85,7 +85,7 @@ public class Performance {
      * 예매된 좌석 수 계산
      */
     public Integer getBookedSeats() {
-        return (int) seats.stream().filter(Seat::getIsBooked).count();
+        return (int) seats.stream().filter(seat -> seat.getIsBooked()).count();
     }
 
     /**

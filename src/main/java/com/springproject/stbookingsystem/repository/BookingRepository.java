@@ -69,6 +69,16 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                                                            @Param("performance") Performance performance);
 
     /**
+     * 특정 사용자와 공연의 모든 예매 조회
+     */
+    List<Booking> findByUserAndPerformance(User user, Performance performance);
+
+    /**
+     * 특정 공연의 모든 예매 조회 (예매일 최신순) - 리스트
+     */
+    List<Booking> findByPerformanceOrderByBookingDateDesc(Performance performance);
+
+    /**
      * 취소 가능한 예매 조회 (공연 24시간 전, 확정 상태)
      */
     @Query("SELECT b FROM Booking b JOIN FETCH b.performance JOIN FETCH b.seat " +
