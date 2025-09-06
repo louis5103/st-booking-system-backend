@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -167,6 +168,7 @@ public class SeatLayoutDTO {
      * 좌석 배치 통계 DTO
      */
     @Getter
+    @Setter
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder

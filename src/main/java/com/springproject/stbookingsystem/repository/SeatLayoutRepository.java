@@ -16,22 +16,26 @@ public interface SeatLayoutRepository extends JpaRepository<SeatLayout, Long> {
     /**
      * 특정 공연장의 모든 좌석 배치 조회 (위치 순)
      */
-    List<SeatLayout> findByVenueOrderByRowNumberAscSeatNumberAsc(Venue venue);
+    @Query("SELECT sl FROM SeatLayout sl WHERE sl.venue = :venue ORDER BY sl.rowNumber ASC, sl.seatNumber ASC")
+    List<SeatLayout> findByVenueOrderByRowNumberAscSeatNumberAsc(@Param("venue") Venue venue);
 
     /**
      * 특정 공연장의 활성 좌석 배치만 조회
      */
-    List<SeatLayout> findByVenueAndIsActiveTrueOrderByRowNumberAscSeatNumberAsc(Venue venue);
+    @Query("SELECT sl FROM SeatLayout sl WHERE sl.venue = :venue AND sl.isActive = true ORDER BY sl.rowNumber ASC, sl.seatNumber ASC")
+    List<SeatLayout> findByVenueAndIsActiveTrueOrderByRowNumberAscSeatNumberAsc(@Param("venue") Venue venue);
 
     /**
      * 공연장 ID로 좌석 배치 조회
      */
-    List<SeatLayout> findByVenueIdOrderByRowNumberAscSeatNumberAsc(Long venueId);
+    @Query("SELECT sl FROM SeatLayout sl WHERE sl.venue.id = :venueId ORDER BY sl.rowNumber ASC, sl.seatNumber ASC")
+    List<SeatLayout> findByVenueIdOrderByRowNumberAscSeatNumberAsc(@Param("venueId") Long venueId);
 
     /**
      * 특정 공연장의 특정 위치 좌석 조회
      */
-    Optional<SeatLayout> findByVenueAndRowNumberAndSeatNumber(Venue venue, Integer rowNumber, Integer seatNumber);
+    @Query("SELECT sl FROM SeatLayout sl WHERE sl.venue = :venue AND sl.rowNumber = :rowNumber AND sl.seatNumber = :seatNumber")
+    Optional<SeatLayout> findByVenueAndRowNumberAndSeatNumber(@Param("venue") Venue venue, @Param("rowNumber") Integer rowNumber, @Param("seatNumber") Integer seatNumber);
 
     /**
      * 특정 공연장의 특정 좌석 타입 조회
@@ -57,7 +61,8 @@ public interface SeatLayoutRepository extends JpaRepository<SeatLayout, Long> {
     /**
      * 특정 공연장의 특정 행의 좌석들 조회
      */
-    List<SeatLayout> findByVenueAndRowNumberOrderBySeatNumberAsc(Venue venue, Integer rowNumber);
+    @Query("SELECT sl FROM SeatLayout sl WHERE sl.venue = :venue AND sl.rowNumber = :rowNumber ORDER BY sl.seatNumber ASC")
+    List<SeatLayout> findByVenueAndRowNumberOrderBySeatNumberAsc(@Param("venue") Venue venue, @Param("rowNumber") Integer rowNumber);
 
     /**
      * 좌석 레이블로 검색
@@ -80,7 +85,9 @@ public interface SeatLayoutRepository extends JpaRepository<SeatLayout, Long> {
     /**
      * 특정 공연장에서 중복되는 좌석 배치가 있는지 확인
      */
-    boolean existsByVenueAndRowNumberAndSeatNumber(Venue venue, Integer rowNumber, Integer seatNumber);
+    @Query("SELECT CASE WHEN COUNT(sl) > 0 THEN true ELSE false END FROM SeatLayout sl " +
+           "WHERE sl.venue = :venue AND sl.rowNumber = :rowNumber AND sl.seatNumber = :seatNumber")
+    boolean existsByVenueAndRowNumberAndSeatNumber(@Param("venue") Venue venue, @Param("rowNumber") Integer rowNumber, @Param("seatNumber") Integer seatNumber);
 
     /**
      * 특정 공연장의 최대 행 번호 조회

@@ -186,7 +186,7 @@ public class SeatLayoutController {
                     .startRow(1)
                     .endRow(10) // 기본 10행
                     .seatsPerRow(10) // 기본 10석
-                    .seatType(SeatLayoutDTO.SeatLayoutBulkRequest.SeatLayoutException.builder().build().getSeatType())
+                    .seatType(com.springproject.stbookingsystem.entity.SeatLayout.SeatType.REGULAR)
                     .isActive(true)
                     .build();
 

@@ -33,30 +33,40 @@ public class DataLoader implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        // 기존 데이터가 있는지 확인
-        if (userRepository.count() > 0) {
-            log.info("초기 데이터가 이미 존재합니다. 스킵합니다.");
-            return;
+        // Docker 환경에서는 매번 초기 데이터 생성
+        // 기존 데이터 확인을 더 관대하게 설정
+        try {
+            if (userRepository.count() > 0) {
+                log.info("초기 데이터가 이미 존재합니다. 스킵합니다.");
+                return;
+            }
+        } catch (Exception e) {
+            log.warn("데이터베이스 상태 확인 중 오류 발생, 초기 데이터를 생성합니다: {}", e.getMessage());
         }
 
         log.info("초기 데이터를 생성합니다...");
 
-        // 관리자 계정 생성
-        createAdminUser();
+        try {
+            // 관리자 계정 생성
+            createAdminUser();
 
-        // 테스트 사용자 계정 생성
-        createTestUsers();
+            // 테스트 사용자 계정 생성
+            createTestUsers();
 
-        // 공연장 생성
-        createSampleVenues();
+            // 공연장 생성
+            createSampleVenues();
 
-        // 샘플 공연 생성
-        createSamplePerformances();
+            // 샘플 공연 생성
+            createSamplePerformances();
 
-        log.info("초기 데이터 생성이 완료되었습니다!");
+            log.info("초기 데이터 생성이 완료되었습니다!");
 
-        // 로그인 정보 출력
-        printLoginInfo();
+            // 로그인 정보 출력
+            printLoginInfo();
+        } catch (Exception e) {
+            log.error("초기 데이터 생성 중 오류 발생: {}", e.getMessage(), e);
+            // Docker 환경에서는 오류가 발생해도 애플리케이션이 계속 실행되도록 함
+        }
     }
 
     private void createAdminUser() {

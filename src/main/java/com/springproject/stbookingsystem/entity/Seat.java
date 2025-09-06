@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
         @Index(name = "idx_seat_number", columnList = "seat_number"),
         @Index(name = "idx_seat_booked", columnList = "is_booked"),
         @Index(name = "idx_seat_performance_booked", columnList = "performance_id, is_booked"),
-        @Index(name = "idx_seat_position", columnList = "row_number, seat_in_row"),
+        @Index(name = "idx_seat_position", columnList = "seat_row, seat_col"),
         @Index(name = "idx_seat_layout", columnList = "seat_layout_id")
     }
 )
@@ -47,10 +47,10 @@ public class Seat {
     @Column(name = "seat_number", nullable = false, length = 10)
     private String seatNumber;
 
-    @Column(name = "row_number")
+    @Column(name = "seat_row")
     private Integer rowNumber;
 
-    @Column(name = "seat_in_row")
+    @Column(name = "seat_col")
     private Integer seatInRow;
 
     @ManyToOne(fetch = FetchType.LAZY)

@@ -13,11 +13,11 @@ import java.time.LocalDateTime;
 @Table(name = "seat_layouts",
     uniqueConstraints = {
         @UniqueConstraint(name = "uk_seat_layout_venue_position", 
-                         columnNames = {"venue_id", "row_number", "seat_number"})
+                         columnNames = {"venue_id", "seat_row", "seat_col"})
     },
     indexes = {
         @Index(name = "idx_seat_layout_venue", columnList = "venue_id"),
-        @Index(name = "idx_seat_layout_position", columnList = "row_number, seat_number"),
+        @Index(name = "idx_seat_layout_position", columnList = "seat_row, seat_col"),
         @Index(name = "idx_seat_layout_type", columnList = "seat_type"),
         @Index(name = "idx_seat_layout_status", columnList = "is_active")
     }
@@ -43,11 +43,11 @@ public class SeatLayout {
     private Venue venue;
 
     @NotNull(message = "행 번호는 필수입니다")
-    @Column(name = "row_number", nullable = false)
+    @Column(name = "seat_row", nullable = false)
     private Integer rowNumber;
 
     @NotNull(message = "좌석 번호는 필수입니다")
-    @Column(name = "seat_number", nullable = false)
+    @Column(name = "seat_col", nullable = false)
     private Integer seatNumber;
 
     @NotBlank(message = "좌석 표시명은 필수입니다")
