@@ -72,6 +72,22 @@ public class SeatLayout {
     @Column(name = "y_position")
     private Integer yPosition; // UI에서의 Y 좌표
 
+    @Column(name = "section_id")
+    private Integer sectionId; // 섹션 ID
+
+    @Column(name = "section_name", length = 50)
+    private String sectionName; // 섹션 이름
+
+    @Column(name = "section_color", length = 7)
+    private String sectionColor; // 섹션 색상 (HEX)
+
+    @Column(name = "rotation")
+    @Builder.Default
+    private Integer rotation = 0; // 좌석 회전각
+
+    @Column(name = "price")
+    private Integer price; // 좌석별 가격
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -149,6 +165,46 @@ public class SeatLayout {
     public void generateSeatLabel() {
         if (venue != null && rowNumber != null && seatNumber != null) {
             this.seatLabel = venue.generateSeatNumber(rowNumber, seatNumber);
+        }
+    }
+
+    /**
+     * 섹션 정보 업데이트
+     */
+    public void updateSection(Integer sectionId, String sectionName, String sectionColor) {
+        this.sectionId = sectionId;
+        this.sectionName = sectionName;
+        this.sectionColor = sectionColor;
+    }
+
+    /**
+     * 좌석 가격 및 회전 정보 업데이트
+     */
+    public void updatePriceAndRotation(Integer price, Integer rotation) {
+        this.price = price;
+        if (rotation != null) {
+            this.rotation = rotation;
+        }
+    }
+
+    /**
+     * 좌석의 완전한 정보 업데이트 (유연한 배치용)
+     */
+    public void updateFlexibleLayout(Integer xPosition, Integer yPosition, 
+                                    Integer sectionId, String sectionName, String sectionColor,
+                                    Integer rotation, Integer price, SeatType seatType, Boolean isActive) {
+        this.xPosition = xPosition;
+        this.yPosition = yPosition;
+        this.sectionId = sectionId;
+        this.sectionName = sectionName;
+        this.sectionColor = sectionColor;
+        this.rotation = rotation != null ? rotation : 0;
+        this.price = price;
+        if (seatType != null) {
+            this.seatType = seatType;
+        }
+        if (isActive != null) {
+            this.isActive = isActive;
         }
     }
 }

@@ -3,233 +3,235 @@ package com.springproject.stbookingsystem.dto;
 import com.springproject.stbookingsystem.entity.SeatLayout;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Getter;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
-import java.time.LocalDateTime;
 import java.util.List;
 
 public class SeatLayoutDTO {
 
-    /**
-     * 좌석 배치 등록/수정 요청 DTO
-     */
-    @Getter
+    @Data
+    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    public static class SeatInfo {
+        private String id;
+        private Integer x;
+        private Integer y;
+        private String type; // REGULAR, VIP, PREMIUM, WHEELCHAIR, BLOCKED
+        private Integer section;
+        private String label;
+        private Integer price;
+        private Boolean isActive;
+    }
+
+    @Data
     @Builder
-    public static class SeatLayoutRequest {
-        @NotNull(message = "공연장 ID는 필수입니다")
-        private Long venueId;
-
-        @NotNull(message = "행 번호는 필수입니다")
-        @Positive(message = "행 번호는 양수여야 합니다")
-        private Integer rowNumber;
-
-        @NotNull(message = "좌석 번호는 필수입니다")
-        @Positive(message = "좌석 번호는 양수여야 합니다")
-        private Integer seatNumber;
-
-        private String seatLabel; // 자동 생성되므로 선택사항
-
-        @NotNull(message = "좌석 타입은 필수입니다")
-        private SeatLayout.SeatType seatType;
-
-        private Boolean isActive = true;
-        private String description;
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class FlexibleSeatInfo {
+        private String id;
+        private Integer x;
+        private Integer y;
+        private Integer sectionId;
+        private String sectionName;
+        private String sectionColor;
+        private Integer rotation;
+        private Integer price;
+        private String seatType;
+        private Boolean isActive;
+        private String seatLabel;
         private Integer xPosition;
         private Integer yPosition;
     }
 
-    /**
-     * 좌석 배치 응답 DTO
-     */
-    @Getter
+    @Data
+    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    public static class FlexibleLayoutRequest {
+        private Long venueId;
+        private List<FlexibleSeatInfo> seats;
+        private StageInfo stage;
+        private CanvasInfo canvasSize;
+    }
+
+    @Data
     @Builder
-    public static class SeatLayoutResponse {
-        private Long id;
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class FlexibleLayoutResponse {
         private Long venueId;
         private String venueName;
-        private Integer rowNumber;
-        private Integer seatNumber;
-        private String seatLabel;
-        private SeatLayout.SeatType seatType;
-        private String seatTypeDescription;
-        private Boolean isActive;
-        private String description;
-        private Integer xPosition;
-        private Integer yPosition;
-        private LocalDateTime createdAt;
-        private LocalDateTime updatedAt;
-
-        // Entity로부터 DTO 생성
-        public static SeatLayoutResponse from(SeatLayout seatLayout) {
-            return SeatLayoutResponse.builder()
-                    .id(seatLayout.getId())
-                    .venueId(seatLayout.getVenue().getId())
-                    .venueName(seatLayout.getVenue().getName())
-                    .rowNumber(seatLayout.getRowNumber())
-                    .seatNumber(seatLayout.getSeatNumber())
-                    .seatLabel(seatLayout.getSeatLabel())
-                    .seatType(seatLayout.getSeatType())
-                    .seatTypeDescription(seatLayout.getSeatType().getDescription())
-                    .isActive(seatLayout.getIsActive())
-                    .description(seatLayout.getDescription())
-                    .xPosition(seatLayout.getXPosition())
-                    .yPosition(seatLayout.getYPosition())
-                    .createdAt(seatLayout.getCreatedAt())
-                    .updatedAt(seatLayout.getUpdatedAt())
-                    .build();
-        }
+        private List<FlexibleSeatInfo> seats;
+        private List<SectionInfo> sections;
+        private StageInfo stage;
+        private CanvasInfo canvasSize;
     }
 
-    /**
-     * 좌석 배치 간단 정보 DTO (좌석 맵용)
-     */
-    @Getter
+    @Data
+    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @Builder
-    public static class SeatLayoutSimple {
-        private Long id;
-        private Integer rowNumber;
-        private Integer seatNumber;
-        private String seatLabel;
-        private SeatLayout.SeatType seatType;
-        private Boolean isActive;
-        private Boolean isBookable;
-        private Integer xPosition;
-        private Integer yPosition;
-
-        public static SeatLayoutSimple from(SeatLayout seatLayout) {
-            return SeatLayoutSimple.builder()
-                    .id(seatLayout.getId())
-                    .rowNumber(seatLayout.getRowNumber())
-                    .seatNumber(seatLayout.getSeatNumber())
-                    .seatLabel(seatLayout.getSeatLabel())
-                    .seatType(seatLayout.getSeatType())
-                    .isActive(seatLayout.getIsActive())
-                    .isBookable(seatLayout.isBookable())
-                    .xPosition(seatLayout.getXPosition())
-                    .yPosition(seatLayout.getYPosition())
-                    .build();
-        }
+    public static class SectionInfo {
+        private Integer id;
+        private String name;
+        private String color;
+        private Integer seatCount;
+        private Integer totalRevenue;
     }
 
-    /**
-     * 좌석 배치 일괄 생성 요청 DTO
-     */
-    @Getter
+    @Data
+    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @Builder
-    public static class SeatLayoutBulkRequest {
-        @NotNull(message = "공연장 ID는 필수입니다")
-        private Long venueId;
-
-        @NotNull(message = "시작 행은 필수입니다")
-        @Positive(message = "시작 행은 양수여야 합니다")
-        private Integer startRow;
-
-        @NotNull(message = "끝 행은 필수입니다")
-        @Positive(message = "끝 행은 양수여야 합니다")
-        private Integer endRow;
-
-        @NotNull(message = "행당 좌석 수는 필수입니다")
-        @Positive(message = "행당 좌석 수는 양수여야 합니다")
-        private Integer seatsPerRow;
-
-        private SeatLayout.SeatType seatType = SeatLayout.SeatType.REGULAR;
-        private Boolean isActive = true;
-        private List<SeatLayoutException> exceptions; // 특별 처리할 좌석들
+    public static class StageInfo {
+        private Integer x;
+        private Integer y;
+        private Integer width;
+        private Integer height;
+        private Integer rotation;
     }
 
-    /**
-     * 좌석 배치 예외 처리 DTO (특정 좌석을 다르게 설정)
-     */
-    @Getter
+    @Data
+    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @Builder
-    public static class SeatLayoutException {
-        private Integer rowNumber;
-        private Integer seatNumber;
-        private SeatLayout.SeatType seatType;
-        private Boolean isActive;
-        private String description;
-    }
-
-    /**
-     * 좌석 배치 통계 DTO
-     */
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class SeatLayoutStatistics {
+    public static class VenueLayoutResponse {
         private Long venueId;
         private String venueName;
+        private List<SeatInfo> seats;
+        private List<SectionInfo> sections;
+        private StageInfo stage;
+        private VenueStatistics statistics;
+        private CanvasInfo canvas;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class VenueLayoutRequest {
+        private List<SeatInfo> seats;
+        private List<SectionInfo> sections;
+        private StageInfo stage;
+        private CanvasInfo canvas;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CanvasInfo {
+        private Integer width;
+        private Integer height;
+        private Integer gridSize;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class VenueStatistics {
         private Integer totalSeats;
         private Integer activeSeats;
-        private Integer bookableSeats;
+        private Integer totalRevenue;
         private Integer regularSeats;
         private Integer vipSeats;
         private Integer premiumSeats;
         private Integer wheelchairSeats;
         private Integer blockedSeats;
-        private Integer aisleSpaces;
-        private Integer stageAreas;
-
-        public static SeatLayoutStatistics create(Long venueId, String venueName) {
-            return SeatLayoutStatistics.builder()
-                    .venueId(venueId)
-                    .venueName(venueName)
-                    .totalSeats(0)
-                    .activeSeats(0)
-                    .bookableSeats(0)
-                    .regularSeats(0)
-                    .vipSeats(0)
-                    .premiumSeats(0)
-                    .wheelchairSeats(0)
-                    .blockedSeats(0)
-                    .aisleSpaces(0)
-                    .stageAreas(0)
-                    .build();
-        }
     }
 
-    /**
-     * 공연장 좌석 맵 전체 정보 DTO
-     */
-    @Getter
+    @Data
+    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    @Builder
-    public static class VenueSeatMap {
-        private Long venueId;
-        private String venueName;
-        private Integer totalRows;
-        private Integer seatsPerRow;
-        private List<List<SeatLayoutSimple>> seatMatrix; // 행별 좌석 배치
-        private SeatLayoutStatistics statistics;
+    public static class TemplateInfo {
+        private String name;
+        private String displayName;
+        private String description;
+        private Integer rows;
+        private Integer cols;
+        private Integer estimatedSeats;
+    }
 
-        public static VenueSeatMap from(Long venueId, String venueName, Integer totalRows, 
-                                      Integer seatsPerRow, List<List<SeatLayoutSimple>> seatMatrix,
-                                      SeatLayoutStatistics statistics) {
-            return VenueSeatMap.builder()
-                    .venueId(venueId)
-                    .venueName(venueName)
-                    .totalRows(totalRows)
-                    .seatsPerRow(seatsPerRow)
-                    .seatMatrix(seatMatrix)
-                    .statistics(statistics)
-                    .build();
-        }
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TemplateConfig {
+        private Integer rows;
+        private Integer cols;
+        private List<Integer> aisleColumns;
+        private Boolean includePremiumSection;
+        private Boolean includeVipSection;
+    }
+
+    // 엔티티 변환 메서드들
+    public static SeatInfo fromEntity(SeatLayout entity) {
+        return SeatInfo.builder()
+                .id(entity.getId().toString())
+                .x(entity.getXPosition())
+                .y(entity.getYPosition())
+                .type(entity.getSeatType().name())
+                .section(entity.getSectionId())
+                .label(entity.getSeatLabel())
+                .price(entity.getPrice())
+                .isActive(entity.getIsActive())
+                .build();
+    }
+
+    public static FlexibleSeatInfo fromEntityFlexible(SeatLayout entity) {
+        return FlexibleSeatInfo.builder()
+                .id(entity.getId().toString())
+                .x(entity.getXPosition())
+                .y(entity.getYPosition())
+                .xPosition(entity.getXPosition())
+                .yPosition(entity.getYPosition())
+                .sectionId(entity.getSectionId())
+                .sectionName(entity.getSectionName())
+                .sectionColor(entity.getSectionColor())
+                .rotation(entity.getRotation())
+                .price(entity.getPrice())
+                .seatType(entity.getSeatType().name())
+                .isActive(entity.getIsActive())
+                .seatLabel(entity.getSeatLabel())
+                .build();
+    }
+
+    public static SeatLayout toEntity(SeatInfo dto, com.springproject.stbookingsystem.entity.Venue venue) {
+        return SeatLayout.builder()
+                .venue(venue)
+                .xPosition(dto.getX())
+                .yPosition(dto.getY())
+                .seatType(SeatLayout.SeatType.valueOf(dto.getType()))
+                .sectionId(dto.getSection())
+                .seatLabel(dto.getLabel())
+                .price(dto.getPrice())
+                .isActive(dto.getIsActive())
+                // 기본값들
+                .rowNumber(1)
+                .seatNumber(1)
+                .build();
+    }
+
+    public static SeatLayout toEntityFlexible(FlexibleSeatInfo dto, com.springproject.stbookingsystem.entity.Venue venue) {
+        return SeatLayout.builder()
+                .venue(venue)
+                .xPosition(dto.getX() != null ? dto.getX() : dto.getXPosition())
+                .yPosition(dto.getY() != null ? dto.getY() : dto.getYPosition())
+                .seatType(SeatLayout.SeatType.valueOf(dto.getSeatType()))
+                .sectionId(dto.getSectionId())
+                .sectionName(dto.getSectionName())
+                .sectionColor(dto.getSectionColor())
+                .rotation(dto.getRotation())
+                .seatLabel(dto.getSeatLabel())
+                .price(dto.getPrice())
+                .isActive(dto.getIsActive())
+                // 기본값들
+                .rowNumber(1)
+                .seatNumber(1)
+                .build();
     }
 }

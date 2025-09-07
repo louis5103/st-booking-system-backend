@@ -14,7 +14,7 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/seat-layouts")
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RequiredArgsConstructor
 public class SeatLayoutController {
@@ -22,14 +22,13 @@ public class SeatLayoutController {
     private final SeatLayoutService seatLayoutService;
 
     /**
-     * 특정 공연장의 좌석 배치 조회
+     * 공연장 좌석 배치 조회
      */
-    @GetMapping("/venues/{venueId}/seat-layouts")
-    public ResponseEntity<?> getSeatLayoutsByVenue(@PathVariable Long venueId) {
+    @GetMapping("/venues/{venueId}")
+    public ResponseEntity<?> getVenueSeatLayout(@PathVariable Long venueId) {
         try {
-            List<SeatLayoutDTO.SeatLayoutResponse> seatLayouts = 
-                    seatLayoutService.getSeatLayoutsByVenue(venueId);
-            return ResponseEntity.ok(seatLayouts);
+            SeatLayoutDTO.VenueLayoutResponse layout = seatLayoutService.getVenueLayout(venueId);
+            return ResponseEntity.ok(layout);
         } catch (Exception e) {
             log.error("좌석 배치 조회 실패: venueId = {}", venueId, e);
             return ResponseEntity.badRequest()
@@ -38,217 +37,89 @@ public class SeatLayoutController {
     }
 
     /**
-     * 특정 공연장의 활성 좌석 배치만 조회
+     * 좌석 배치 저장 (전체 업데이트)
      */
-    @GetMapping("/venues/{venueId}/seat-layouts/active")
-    public ResponseEntity<?> getActiveSeatLayoutsByVenue(@PathVariable Long venueId) {
-        try {
-            List<SeatLayoutDTO.SeatLayoutSimple> seatLayouts = 
-                    seatLayoutService.getActiveSeatLayoutsByVenue(venueId);
-            return ResponseEntity.ok(seatLayouts);
-        } catch (Exception e) {
-            log.error("활성 좌석 배치 조회 실패: venueId = {}", venueId, e);
-            return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("활성 좌석 배치 조회 실패: " + e.getMessage()));
-        }
-    }
-
-    /**
-     * 공연장 좌석 맵 전체 조회 (행렬 형태)
-     */
-    @GetMapping("/venues/{venueId}/seat-map")
-    public ResponseEntity<?> getVenueSeatMap(@PathVariable Long venueId) {
-        try {
-            SeatLayoutDTO.VenueSeatMap seatMap = seatLayoutService.getVenueSeatMap(venueId);
-            return ResponseEntity.ok(seatMap);
-        } catch (Exception e) {
-            log.error("좌석 맵 조회 실패: venueId = {}", venueId, e);
-            return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("좌석 맵 조회 실패: " + e.getMessage()));
-        }
-    }
-
-    /**
-     * 좌석 배치 단일 등록 (관리자만)
-     */
-    @PostMapping("/seat-layouts")
+    @PostMapping("/venues/{venueId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> createSeatLayout(@Valid @RequestBody SeatLayoutDTO.SeatLayoutRequest request) {
+    public ResponseEntity<?> saveVenueSeatLayout(
+            @PathVariable Long venueId,
+            @Valid @RequestBody SeatLayoutDTO.VenueLayoutRequest request) {
         try {
-            SeatLayoutDTO.SeatLayoutResponse seatLayout = seatLayoutService.createSeatLayout(request);
-            return ResponseEntity.status(HttpStatus.CREATED).body(seatLayout);
+            SeatLayoutDTO.VenueLayoutResponse layout = seatLayoutService.saveVenueLayout(venueId, request);
+            return ResponseEntity.ok(layout);
         } catch (Exception e) {
-            log.error("좌석 배치 등록 실패", e);
+            log.error("좌석 배치 저장 실패: venueId = {}", venueId, e);
             return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("좌석 배치 등록 실패: " + e.getMessage()));
+                    .body(new ErrorResponse("좌석 배치 저장 실패: " + e.getMessage()));
         }
     }
 
     /**
-     * 좌석 배치 일괄 등록 (관리자만)
+     * 좌석 배치 템플릿 적용
      */
-    @PostMapping("/seat-layouts/bulk")
+    @PostMapping("/venues/{venueId}/templates/{templateName}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> createSeatLayoutsBulk(@Valid @RequestBody SeatLayoutDTO.SeatLayoutBulkRequest request) {
+    public ResponseEntity<?> applyTemplate(
+            @PathVariable Long venueId, 
+            @PathVariable String templateName,
+            @RequestBody(required = false) SeatLayoutDTO.TemplateConfig config) {
         try {
-            List<SeatLayoutDTO.SeatLayoutResponse> seatLayouts = 
-                    seatLayoutService.createSeatLayoutsBulk(request);
-            return ResponseEntity.status(HttpStatus.CREATED).body(seatLayouts);
+            SeatLayoutDTO.VenueLayoutResponse layout = seatLayoutService.applyTemplate(venueId, templateName, config);
+            return ResponseEntity.ok(layout);
         } catch (Exception e) {
-            log.error("좌석 배치 일괄 등록 실패", e);
+            log.error("템플릿 적용 실패: venueId = {}, template = {}", venueId, templateName, e);
             return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("좌석 배치 일괄 등록 실패: " + e.getMessage()));
+                    .body(new ErrorResponse("템플릿 적용 실패: " + e.getMessage()));
         }
     }
 
     /**
-     * 좌석 배치 수정 (관리자만)
+     * 좌석 배치 초기화
      */
-    @PutMapping("/seat-layouts/{id}")
+    @DeleteMapping("/venues/{venueId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateSeatLayout(@PathVariable Long id,
-                                             @Valid @RequestBody SeatLayoutDTO.SeatLayoutRequest request) {
+    public ResponseEntity<?> clearVenueSeatLayout(@PathVariable Long venueId) {
         try {
-            SeatLayoutDTO.SeatLayoutResponse seatLayout = seatLayoutService.updateSeatLayout(id, request);
-            return ResponseEntity.ok(seatLayout);
+            seatLayoutService.clearVenueLayout(venueId);
+            return ResponseEntity.ok(new SuccessResponse("좌석 배치가 초기화되었습니다"));
         } catch (Exception e) {
-            log.error("좌석 배치 수정 실패: ID = {}", id, e);
+            log.error("좌석 배치 초기화 실패: venueId = {}", venueId, e);
             return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("좌석 배치 수정 실패: " + e.getMessage()));
+                    .body(new ErrorResponse("좌석 배치 초기화 실패: " + e.getMessage()));
         }
     }
 
     /**
-     * 좌석 배치 삭제 (관리자만)
+     * 사용 가능한 템플릿 목록 조회
      */
-    @DeleteMapping("/seat-layouts/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> deleteSeatLayout(@PathVariable Long id) {
+    @GetMapping("/templates")
+    public ResponseEntity<?> getAvailableTemplates() {
         try {
-            seatLayoutService.deleteSeatLayout(id);
-            return ResponseEntity.ok(new SuccessResponse("좌석 배치가 성공적으로 삭제되었습니다"));
+            List<SeatLayoutDTO.TemplateInfo> templates = seatLayoutService.getAvailableTemplates();
+            return ResponseEntity.ok(templates);
         } catch (Exception e) {
-            log.error("좌석 배치 삭제 실패: ID = {}", id, e);
+            log.error("템플릿 목록 조회 실패", e);
             return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("좌석 배치 삭제 실패: " + e.getMessage()));
+                    .body(new ErrorResponse("템플릿 목록 조회 실패: " + e.getMessage()));
         }
     }
 
     /**
-     * 공연장 좌석 배치 통계 조회
+     * 좌석 배치 통계 조회
      */
-    @GetMapping("/venues/{venueId}/seat-statistics")
-    public ResponseEntity<?> getSeatLayoutStatistics(@PathVariable Long venueId) {
+    @GetMapping("/venues/{venueId}/statistics")
+    public ResponseEntity<?> getVenueStatistics(@PathVariable Long venueId) {
         try {
-            SeatLayoutDTO.SeatLayoutStatistics statistics = 
-                    seatLayoutService.getSeatLayoutStatistics(venueId);
+            SeatLayoutDTO.VenueStatistics statistics = seatLayoutService.getVenueStatistics(venueId);
             return ResponseEntity.ok(statistics);
         } catch (Exception e) {
-            log.error("좌석 배치 통계 조회 실패: venueId = {}", venueId, e);
+            log.error("통계 조회 실패: venueId = {}", venueId, e);
             return ResponseEntity.badRequest()
                     .body(new ErrorResponse("통계 조회 실패: " + e.getMessage()));
         }
     }
 
-    /**
-     * 좌석 배치 일괄 삭제 (관리자만) - 특정 공연장의 모든 좌석
-     */
-    @DeleteMapping("/venues/{venueId}/seat-layouts")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> deleteAllSeatLayoutsForVenue(@PathVariable Long venueId) {
-        try {
-            List<SeatLayoutDTO.SeatLayoutResponse> existingLayouts = 
-                    seatLayoutService.getSeatLayoutsByVenue(venueId);
-            
-            for (SeatLayoutDTO.SeatLayoutResponse layout : existingLayouts) {
-                seatLayoutService.deleteSeatLayout(layout.getId());
-            }
-            
-            return ResponseEntity.ok(new SuccessResponse(
-                    String.format("공연장의 모든 좌석 배치가 삭제되었습니다 (%d개)", existingLayouts.size())));
-        } catch (Exception e) {
-            log.error("공연장 좌석 배치 일괄 삭제 실패: venueId = {}", venueId, e);
-            return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("좌석 배치 일괄 삭제 실패: " + e.getMessage()));
-        }
-    }
-
-    /**
-     * 공연장 기본 좌석 배치 자동 생성 (관리자만)
-     */
-    @PostMapping("/venues/{venueId}/seat-layouts/auto-generate")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> autoGenerateSeatLayouts(@PathVariable Long venueId) {
-        try {
-            // 공연장 정보를 기반으로 기본 좌석 배치 자동 생성
-            SeatLayoutDTO.SeatLayoutBulkRequest autoRequest = SeatLayoutDTO.SeatLayoutBulkRequest.builder()
-                    .venueId(venueId)
-                    .startRow(1)
-                    .endRow(10) // 기본 10행
-                    .seatsPerRow(10) // 기본 10석
-                    .seatType(com.springproject.stbookingsystem.entity.SeatLayout.SeatType.REGULAR)
-                    .isActive(true)
-                    .build();
-
-            List<SeatLayoutDTO.SeatLayoutResponse> seatLayouts = 
-                    seatLayoutService.createSeatLayoutsBulk(autoRequest);
-            
-            return ResponseEntity.status(HttpStatus.CREATED).body(new AutoGenerateResponse(
-                    "기본 좌석 배치가 자동 생성되었습니다", seatLayouts.size(), seatLayouts));
-        } catch (Exception e) {
-            log.error("좌석 배치 자동 생성 실패: venueId = {}", venueId, e);
-            return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("좌석 배치 자동 생성 실패: " + e.getMessage()));
-        }
-    }
-
     // 응답 클래스들
-    static class ErrorResponse {
-        private String message;
-
-        public ErrorResponse(String message) {
-            this.message = message;
-        }
-
-        public String getMessage() {
-            return message;
-        }
-    }
-
-    static class SuccessResponse {
-        private String message;
-
-        public SuccessResponse(String message) {
-            this.message = message;
-        }
-
-        public String getMessage() {
-            return message;
-        }
-    }
-
-    static class AutoGenerateResponse {
-        private String message;
-        private int generatedCount;
-        private List<SeatLayoutDTO.SeatLayoutResponse> seatLayouts;
-
-        public AutoGenerateResponse(String message, int generatedCount, 
-                                  List<SeatLayoutDTO.SeatLayoutResponse> seatLayouts) {
-            this.message = message;
-            this.generatedCount = generatedCount;
-            this.seatLayouts = seatLayouts;
-        }
-
-        public String getMessage() {
-            return message;
-        }
-
-        public int getGeneratedCount() {
-            return generatedCount;
-        }
-
-        public List<SeatLayoutDTO.SeatLayoutResponse> getSeatLayouts() {
-            return seatLayouts;
-        }
-    }
+    record ErrorResponse(String message) {}
+    record SuccessResponse(String message) {}
 }

@@ -3,6 +3,7 @@ package com.springproject.stbookingsystem.repository;
 import com.springproject.stbookingsystem.entity.SeatLayout;
 import com.springproject.stbookingsystem.entity.Venue;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -12,6 +13,17 @@ import java.util.Optional;
 
 @Repository
 public interface SeatLayoutRepository extends JpaRepository<SeatLayout, Long> {
+
+    /**
+     * 특정 공연장의 모든 좌석 배치 조회 (ID 순)
+     */
+    List<SeatLayout> findByVenueOrderByIdAsc(Venue venue);
+
+    /**
+     * 특정 공연장의 좌석 배치 삭제
+     */
+    @Modifying
+    void deleteByVenue(Venue venue);
 
     /**
      * 특정 공연장의 모든 좌석 배치 조회 (위치 순)
@@ -101,4 +113,44 @@ public interface SeatLayoutRepository extends JpaRepository<SeatLayout, Long> {
     @Query("SELECT MAX(sl.seatNumber) FROM SeatLayout sl " +
            "WHERE sl.venue = :venue AND sl.rowNumber = :rowNumber")
     Integer findMaxSeatNumberByVenueAndRow(@Param("venue") Venue venue, @Param("rowNumber") Integer rowNumber);
+
+    /**
+     * 특정 공연장의 특정 섹션 좌석들 조회
+     */
+    @Query("SELECT sl FROM SeatLayout sl WHERE sl.venue = :venue AND sl.sectionId = :sectionId ORDER BY sl.rowNumber ASC, sl.seatNumber ASC")
+    List<SeatLayout> findByVenueAndSectionId(@Param("venue") Venue venue, @Param("sectionId") Integer sectionId);
+
+    /**
+     * 특정 공연장의 모든 섹션 ID 조회
+     */
+    @Query("SELECT DISTINCT sl.sectionId FROM SeatLayout sl WHERE sl.venue = :venue AND sl.sectionId IS NOT NULL ORDER BY sl.sectionId")
+    List<Integer> findDistinctSectionIdsByVenue(@Param("venue") Venue venue);
+
+    /**
+     * 특정 공연장의 섹션별 좌석 수 조회
+     */
+    @Query("SELECT sl.sectionId, COUNT(sl) FROM SeatLayout sl " +
+           "WHERE sl.venue = :venue AND sl.sectionId IS NOT NULL " +
+           "GROUP BY sl.sectionId ORDER BY sl.sectionId")
+    List<Object[]> countSeatsBySectionForVenue(@Param("venue") Venue venue);
+
+    /**
+     * 특정 공연장의 섹션별 수익 조회
+     */
+    @Query("SELECT sl.sectionId, SUM(COALESCE(sl.price, 0)) FROM SeatLayout sl " +
+           "WHERE sl.venue = :venue AND sl.sectionId IS NOT NULL " +
+           "GROUP BY sl.sectionId ORDER BY sl.sectionId")
+    List<Object[]> sumRevenueBySectionForVenue(@Param("venue") Venue venue);
+
+    /**
+     * X, Y 좌표로 좌석 조회 (유연한 배치용)
+     */
+    @Query("SELECT sl FROM SeatLayout sl WHERE sl.venue = :venue AND sl.xPosition = :xPosition AND sl.yPosition = :yPosition")
+    List<SeatLayout> findByVenueAndPosition(@Param("venue") Venue venue, @Param("xPosition") Integer xPosition, @Param("yPosition") Integer yPosition);
+
+    /**
+     * 특정 공연장의 좌석을 섹션별로 그룹화하여 조회
+     */
+    @Query("SELECT sl FROM SeatLayout sl WHERE sl.venue = :venue ORDER BY sl.sectionId ASC, sl.seatLabel ASC")
+    List<SeatLayout> findByVenueOrderBySectionIdAscSeatLabelAsc(@Param("venue") Venue venue);
 }

@@ -10,10 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -25,268 +22,385 @@ public class SeatLayoutService {
     private final SeatLayoutRepository seatLayoutRepository;
     private final VenueRepository venueRepository;
 
+    // 템플릿 정의
+    private static final Map<String, SeatLayoutDTO.TemplateInfo> TEMPLATES = Map.of(
+        "small_theater", SeatLayoutDTO.TemplateInfo.builder()
+            .name("small_theater")
+            .displayName("소형 극장")
+            .description("10행 8열의 소형 극장 배치")
+            .rows(10).cols(8).estimatedSeats(70)
+            .build(),
+        "medium_theater", SeatLayoutDTO.TemplateInfo.builder()
+            .name("medium_theater")
+            .displayName("중형 극장")
+            .description("15행 12열의 중형 극장 배치")
+            .rows(15).cols(12).estimatedSeats(160)
+            .build(),
+        "large_theater", SeatLayoutDTO.TemplateInfo.builder()
+            .name("large_theater")
+            .displayName("대형 극장")
+            .description("20행 16열의 대형 극장 배치")
+            .rows(20).cols(16).estimatedSeats(280)
+            .build(),
+        "concert_hall", SeatLayoutDTO.TemplateInfo.builder()
+            .name("concert_hall")
+            .displayName("콘서트홀")
+            .description("25행 20열의 콘서트홀 배치")
+            .rows(25).cols(20).estimatedSeats(450)
+            .build()
+    );
+
     /**
-     * 특정 공연장의 좌석 배치 조회
+     * 공연장 좌석 배치 조회
      */
-    public List<SeatLayoutDTO.SeatLayoutResponse> getSeatLayoutsByVenue(Long venueId) {
+    public SeatLayoutDTO.VenueLayoutResponse getVenueLayout(Long venueId) {
         log.info("공연장 좌석 배치 조회: venueId = {}", venueId);
-        
-        return seatLayoutRepository.findByVenueIdOrderByRowNumberAscSeatNumberAsc(venueId)
-                .stream()
-                .map(SeatLayoutDTO.SeatLayoutResponse::from)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 특정 공연장의 활성 좌석 배치만 조회
-     */
-    public List<SeatLayoutDTO.SeatLayoutSimple> getActiveSeatLayoutsByVenue(Long venueId) {
-        log.info("공연장 활성 좌석 배치 조회: venueId = {}", venueId);
 
         Venue venue = venueRepository.findById(venueId)
                 .orElseThrow(() -> new RuntimeException("공연장을 찾을 수 없습니다: " + venueId));
 
-        return seatLayoutRepository.findByVenueAndIsActiveTrueOrderByRowNumberAscSeatNumberAsc(venue)
-                .stream()
-                .map(SeatLayoutDTO.SeatLayoutSimple::from)
+        List<SeatLayout> seatLayouts = seatLayoutRepository.findByVenueOrderByIdAsc(venue);
+        
+        // 좌석 정보 변환
+        List<SeatLayoutDTO.SeatInfo> seats = seatLayouts.stream()
+                .map(SeatLayoutDTO::fromEntity)
                 .collect(Collectors.toList());
-    }
 
-    /**
-     * 공연장 좌석 맵 전체 조회 (행렬 형태)
-     */
-    public SeatLayoutDTO.VenueSeatMap getVenueSeatMap(Long venueId) {
-        log.info("공연장 좌석 맵 조회: venueId = {}", venueId);
-
-        Venue venue = venueRepository.findById(venueId)
-                .orElseThrow(() -> new RuntimeException("공연장을 찾을 수 없습니다: " + venueId));
-
-        List<SeatLayout> seatLayouts = seatLayoutRepository.findByVenueOrderByRowNumberAscSeatNumberAsc(venue);
-        
-        // 행별로 좌석을 그룹화
-        Map<Integer, List<SeatLayoutDTO.SeatLayoutSimple>> rowMap = new HashMap<>();
-        
-        for (SeatLayout seatLayout : seatLayouts) {
-            rowMap.computeIfAbsent(seatLayout.getRowNumber(), k -> new ArrayList<>())
-                   .add(SeatLayoutDTO.SeatLayoutSimple.from(seatLayout));
-        }
-
-        // 행렬 형태로 변환
-        List<List<SeatLayoutDTO.SeatLayoutSimple>> seatMatrix = new ArrayList<>();
-        for (int row = 1; row <= venue.getTotalRows(); row++) {
-            List<SeatLayoutDTO.SeatLayoutSimple> rowSeats = rowMap.getOrDefault(row, new ArrayList<>());
-            seatMatrix.add(rowSeats);
-        }
+        // 섹션 정보 생성
+        List<SeatLayoutDTO.SectionInfo> sections = generateSectionInfo(seatLayouts);
 
         // 통계 생성
-        SeatLayoutDTO.SeatLayoutStatistics statistics = generateStatistics(venue, seatLayouts);
+        SeatLayoutDTO.VenueStatistics statistics = generateStatistics(seatLayouts);
 
-        return SeatLayoutDTO.VenueSeatMap.from(
-                venueId, venue.getName(), venue.getTotalRows(), 
-                venue.getSeatsPerRow(), seatMatrix, statistics
-        );
-    }
-
-    /**
-     * 좌석 배치 단일 등록
-     */
-    @Transactional
-    public SeatLayoutDTO.SeatLayoutResponse createSeatLayout(SeatLayoutDTO.SeatLayoutRequest request) {
-        log.info("좌석 배치 등록: venueId = {}, row = {}, seat = {}", 
-                request.getVenueId(), request.getRowNumber(), request.getSeatNumber());
-
-        Venue venue = venueRepository.findById(request.getVenueId())
-                .orElseThrow(() -> new RuntimeException("공연장을 찾을 수 없습니다: " + request.getVenueId()));
-
-        // 중복 확인
-        if (seatLayoutRepository.existsByVenueAndRowNumberAndSeatNumber(
-                venue, request.getRowNumber(), request.getSeatNumber())) {
-            throw new RuntimeException("이미 존재하는 좌석 위치입니다: " + 
-                    request.getRowNumber() + "-" + request.getSeatNumber());
-        }
-
-        // 좌석 위치 검증
-        validateSeatPosition(venue, request.getRowNumber(), request.getSeatNumber());
-
-        SeatLayout seatLayout = SeatLayout.builder()
-                .venue(venue)
-                .rowNumber(request.getRowNumber())
-                .seatNumber(request.getSeatNumber())
-                .seatType(request.getSeatType())
-                .isActive(request.getIsActive())
-                .description(request.getDescription())
-                .xPosition(request.getXPosition())
-                .yPosition(request.getYPosition())
+        // 기본 무대 정보
+        SeatLayoutDTO.StageInfo stage = SeatLayoutDTO.StageInfo.builder()
+                .x(200).y(50).width(200).height(60).rotation(0)
                 .build();
 
-        // 좌석 레이블 자동 생성
-        seatLayout.generateSeatLabel();
+        // 기본 캔버스 정보
+        SeatLayoutDTO.CanvasInfo canvas = SeatLayoutDTO.CanvasInfo.builder()
+                .width(800).height(600).gridSize(40)
+                .build();
 
-        SeatLayout savedSeatLayout = seatLayoutRepository.save(seatLayout);
-        log.info("좌석 배치 등록 완료: ID = {}", savedSeatLayout.getId());
-
-        return SeatLayoutDTO.SeatLayoutResponse.from(savedSeatLayout);
+        return SeatLayoutDTO.VenueLayoutResponse.builder()
+                .venueId(venueId)
+                .venueName(venue.getName())
+                .seats(seats)
+                .sections(sections)
+                .stage(stage)
+                .statistics(statistics)
+                .canvas(canvas)
+                .build();
     }
 
     /**
-     * 좌석 배치 일괄 등록
+     * 유연한 좌석 배치 조회
      */
-    @Transactional
-    public List<SeatLayoutDTO.SeatLayoutResponse> createSeatLayoutsBulk(SeatLayoutDTO.SeatLayoutBulkRequest request) {
-        log.info("좌석 배치 일괄 등록: venueId = {}, rows = {} ~ {}", 
-                request.getVenueId(), request.getStartRow(), request.getEndRow());
-
-        Venue venue = venueRepository.findById(request.getVenueId())
-                .orElseThrow(() -> new RuntimeException("공연장을 찾을 수 없습니다: " + request.getVenueId()));
-
-        List<SeatLayout> seatLayouts = new ArrayList<>();
-
-        for (int row = request.getStartRow(); row <= request.getEndRow(); row++) {
-            for (int seat = 1; seat <= request.getSeatsPerRow(); seat++) {
-                // 중복 확인
-                if (seatLayoutRepository.existsByVenueAndRowNumberAndSeatNumber(venue, row, seat)) {
-                    log.warn("이미 존재하는 좌석 건너뜀: {}-{}", row, seat);
-                    continue;
-                }
-
-                // 예외 처리 확인
-                SeatLayoutDTO.SeatLayoutException exception = findException(request.getExceptions(), row, seat);
-                
-                SeatLayout seatLayout = SeatLayout.builder()
-                        .venue(venue)
-                        .rowNumber(row)
-                        .seatNumber(seat)
-                        .seatType(exception != null ? exception.getSeatType() : request.getSeatType())
-                        .isActive(exception != null ? exception.getIsActive() : request.getIsActive())
-                        .description(exception != null ? exception.getDescription() : null)
-                        .build();
-
-                seatLayout.generateSeatLabel();
-                seatLayouts.add(seatLayout);
-            }
-        }
-
-        List<SeatLayout> savedSeatLayouts = seatLayoutRepository.saveAll(seatLayouts);
-        log.info("좌석 배치 일괄 등록 완료: {} 개 좌석", savedSeatLayouts.size());
-
-        return savedSeatLayouts.stream()
-                .map(SeatLayoutDTO.SeatLayoutResponse::from)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 좌석 배치 수정
-     */
-    @Transactional
-    public SeatLayoutDTO.SeatLayoutResponse updateSeatLayout(Long id, SeatLayoutDTO.SeatLayoutRequest request) {
-        log.info("좌석 배치 수정: ID = {}", id);
-
-        SeatLayout seatLayout = seatLayoutRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("좌석 배치를 찾을 수 없습니다: " + id));
-
-        // 위치 변경 시 중복 확인
-        if (!seatLayout.getRowNumber().equals(request.getRowNumber()) ||
-            !seatLayout.getSeatNumber().equals(request.getSeatNumber())) {
-            
-            if (seatLayoutRepository.existsByVenueAndRowNumberAndSeatNumber(
-                    seatLayout.getVenue(), request.getRowNumber(), request.getSeatNumber())) {
-                throw new RuntimeException("이미 존재하는 좌석 위치입니다: " + 
-                        request.getRowNumber() + "-" + request.getSeatNumber());
-            }
-
-            validateSeatPosition(seatLayout.getVenue(), request.getRowNumber(), request.getSeatNumber());
-            seatLayout.setRowNumber(request.getRowNumber());
-            seatLayout.setSeatNumber(request.getSeatNumber());
-            seatLayout.generateSeatLabel();
-        }
-
-        seatLayout.updateSeatInfo(request.getSeatType(), request.getIsActive(), request.getDescription());
-        seatLayout.updatePosition(request.getXPosition(), request.getYPosition());
-
-        SeatLayout savedSeatLayout = seatLayoutRepository.save(seatLayout);
-        log.info("좌석 배치 수정 완료: ID = {}", savedSeatLayout.getId());
-
-        return SeatLayoutDTO.SeatLayoutResponse.from(savedSeatLayout);
-    }
-
-    /**
-     * 좌석 배치 삭제
-     */
-    @Transactional
-    public void deleteSeatLayout(Long id) {
-        log.info("좌석 배치 삭제: ID = {}", id);
-
-        SeatLayout seatLayout = seatLayoutRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("좌석 배치를 찾을 수 없습니다: " + id));
-
-        seatLayoutRepository.delete(seatLayout);
-        log.info("좌석 배치 삭제 완료: ID = {}", id);
-    }
-
-    /**
-     * 공연장 좌석 배치 통계
-     */
-    public SeatLayoutDTO.SeatLayoutStatistics getSeatLayoutStatistics(Long venueId) {
-        log.info("좌석 배치 통계 조회: venueId = {}", venueId);
+    public SeatLayoutDTO.FlexibleLayoutResponse getFlexibleSeatMap(Long venueId) {
+        log.info("유연한 좌석 배치 조회: venueId = {}", venueId);
 
         Venue venue = venueRepository.findById(venueId)
                 .orElseThrow(() -> new RuntimeException("공연장을 찾을 수 없습니다: " + venueId));
 
-        List<SeatLayout> seatLayouts = seatLayoutRepository.findByVenueOrderByRowNumberAscSeatNumberAsc(venue);
+        List<SeatLayout> seatLayouts = seatLayoutRepository.findByVenueOrderByIdAsc(venue);
         
-        return generateStatistics(venue, seatLayouts);
+        // 좌석 정보 변환 (유연한 배치용)
+        List<SeatLayoutDTO.FlexibleSeatInfo> seats = seatLayouts.stream()
+                .map(SeatLayoutDTO::fromEntityFlexible)
+                .collect(Collectors.toList());
+
+        // 섹션 정보 생성
+        List<SeatLayoutDTO.SectionInfo> sections = generateSectionInfo(seatLayouts);
+
+        // 기본 무대 정보
+        SeatLayoutDTO.StageInfo stage = SeatLayoutDTO.StageInfo.builder()
+                .x(300).y(50).width(200).height(60).rotation(0)
+                .build();
+
+        // 기본 캔버스 정보
+        SeatLayoutDTO.CanvasInfo canvasSize = SeatLayoutDTO.CanvasInfo.builder()
+                .width(800).height(600).gridSize(20)
+                .build();
+
+        return SeatLayoutDTO.FlexibleLayoutResponse.builder()
+                .venueId(venueId)
+                .venueName(venue.getName())
+                .seats(seats)
+                .sections(sections)
+                .stage(stage)
+                .canvasSize(canvasSize)
+                .build();
     }
 
-    // 비공개 메소드들
-
     /**
-     * 좌석 위치 검증
+     * 유연한 좌석 배치 저장
      */
-    private void validateSeatPosition(Venue venue, Integer rowNumber, Integer seatNumber) {
-        if (rowNumber <= 0 || rowNumber > venue.getTotalRows()) {
-            throw new RuntimeException("유효하지 않은 행 번호입니다: " + rowNumber);
+    @Transactional
+    public SeatLayoutDTO.FlexibleLayoutResponse updateFlexibleLayout(SeatLayoutDTO.FlexibleLayoutRequest request) {
+        log.info("유연한 좌석 배치 저장: venueId = {}, seatCount = {}", 
+                request.getVenueId(), 
+                request.getSeats() != null ? request.getSeats().size() : 0);
+
+        Venue venue = venueRepository.findById(request.getVenueId())
+                .orElseThrow(() -> new RuntimeException("공연장을 찾을 수 없습니다: " + request.getVenueId()));
+
+        // 기존 좌석 삭제
+        seatLayoutRepository.deleteByVenue(venue);
+
+        // 새 좌석 생성
+        List<SeatLayout> newSeats = new ArrayList<>();
+        if (request.getSeats() != null) {
+            for (SeatLayoutDTO.FlexibleSeatInfo seatInfo : request.getSeats()) {
+                SeatLayout seat = SeatLayoutDTO.toEntityFlexible(seatInfo, venue);
+                newSeats.add(seat);
+            }
         }
-        if (seatNumber <= 0 || seatNumber > venue.getSeatsPerRow()) {
-            throw new RuntimeException("유효하지 않은 좌석 번호입니다: " + seatNumber);
-        }
+
+        // 저장
+        List<SeatLayout> savedSeats = seatLayoutRepository.saveAll(newSeats);
+        log.info("유연한 좌석 배치 저장 완료: {} 개 좌석", savedSeats.size());
+
+        return getFlexibleSeatMap(request.getVenueId());
     }
 
     /**
-     * 예외 처리 좌석 찾기
+     * 좌석 배치 저장
      */
-    private SeatLayoutDTO.SeatLayoutException findException(List<SeatLayoutDTO.SeatLayoutException> exceptions, 
-                                                          int row, int seat) {
-        if (exceptions == null) return null;
+    @Transactional
+    public SeatLayoutDTO.VenueLayoutResponse saveVenueLayout(Long venueId, SeatLayoutDTO.VenueLayoutRequest request) {
+        log.info("좌석 배치 저장: venueId = {}, seatCount = {}", venueId, 
+                request.getSeats() != null ? request.getSeats().size() : 0);
+
+        Venue venue = venueRepository.findById(venueId)
+                .orElseThrow(() -> new RuntimeException("공연장을 찾을 수 없습니다: " + venueId));
+
+        // 기존 좌석 삭제
+        seatLayoutRepository.deleteByVenue(venue);
+
+        // 새 좌석 생성
+        List<SeatLayout> newSeats = new ArrayList<>();
+        if (request.getSeats() != null) {
+            for (SeatLayoutDTO.SeatInfo seatInfo : request.getSeats()) {
+                SeatLayout seat = SeatLayoutDTO.toEntity(seatInfo, venue);
+                newSeats.add(seat);
+            }
+        }
+
+        // 저장
+        List<SeatLayout> savedSeats = seatLayoutRepository.saveAll(newSeats);
+        log.info("좌석 배치 저장 완료: {} 개 좌석", savedSeats.size());
+
+        return getVenueLayout(venueId);
+    }
+
+    /**
+     * 템플릿 적용
+     */
+    @Transactional
+    public SeatLayoutDTO.VenueLayoutResponse applyTemplate(Long venueId, String templateName, SeatLayoutDTO.TemplateConfig config) {
+        log.info("템플릿 적용: venueId = {}, template = {}", venueId, templateName);
+
+        Venue venue = venueRepository.findById(venueId)
+                .orElseThrow(() -> new RuntimeException("공연장을 찾을 수 없습니다: " + venueId));
+
+        SeatLayoutDTO.TemplateInfo template = TEMPLATES.get(templateName);
+        if (template == null) {
+            throw new RuntimeException("존재하지 않는 템플릿입니다: " + templateName);
+        }
+
+        // 기존 좌석 삭제
+        seatLayoutRepository.deleteByVenue(venue);
+
+        // 템플릿에 따른 좌석 생성
+        List<SeatLayout> templateSeats = generateTemplateSeats(venue, template, config);
         
-        return exceptions.stream()
-                .filter(ex -> ex.getRowNumber().equals(row) && ex.getSeatNumber().equals(seat))
-                .findFirst()
-                .orElse(null);
+        // 저장
+        List<SeatLayout> savedSeats = seatLayoutRepository.saveAll(templateSeats);
+        log.info("템플릿 적용 완료: {} 개 좌석 생성", savedSeats.size());
+
+        return getVenueLayout(venueId);
     }
 
     /**
-     * 좌석 배치 통계 생성
+     * 좌석 배치 초기화
      */
-    private SeatLayoutDTO.SeatLayoutStatistics generateStatistics(Venue venue, List<SeatLayout> seatLayouts) {
-        SeatLayoutDTO.SeatLayoutStatistics stats = SeatLayoutDTO.SeatLayoutStatistics.create(
-                venue.getId(), venue.getName());
+    @Transactional
+    public void clearVenueLayout(Long venueId) {
+        log.info("좌석 배치 초기화: venueId = {}", venueId);
 
-        stats.setTotalSeats(seatLayouts.size());
-        stats.setActiveSeats((int) seatLayouts.stream().filter(SeatLayout::getIsActive).count());
-        stats.setBookableSeats((int) seatLayouts.stream().filter(SeatLayout::isBookable).count());
+        Venue venue = venueRepository.findById(venueId)
+                .orElseThrow(() -> new RuntimeException("공연장을 찾을 수 없습니다: " + venueId));
 
-        // 타입별 카운트
+        seatLayoutRepository.deleteByVenue(venue);
+        log.info("좌석 배치 초기화 완료");
+    }
+
+    /**
+     * 사용 가능한 템플릿 목록 조회
+     */
+    public List<SeatLayoutDTO.TemplateInfo> getAvailableTemplates() {
+        return new ArrayList<>(TEMPLATES.values());
+    }
+
+    /**
+     * 공연장 통계 조회
+     */
+    public SeatLayoutDTO.VenueStatistics getVenueStatistics(Long venueId) {
+        log.info("공연장 통계 조회: venueId = {}", venueId);
+
+        Venue venue = venueRepository.findById(venueId)
+                .orElseThrow(() -> new RuntimeException("공연장을 찾을 수 없습니다: " + venueId));
+
+        List<SeatLayout> seatLayouts = seatLayoutRepository.findByVenueOrderByIdAsc(venue);
+        return generateStatistics(seatLayouts);
+    }
+
+    // 프라이빗 메서드들
+
+    /**
+     * 템플릿 좌석 생성
+     */
+    private List<SeatLayout> generateTemplateSeats(Venue venue, SeatLayoutDTO.TemplateInfo template, SeatLayoutDTO.TemplateConfig config) {
+        List<SeatLayout> seats = new ArrayList<>();
+        
+        int rows = config != null && config.getRows() != null ? config.getRows() : template.getRows();
+        int cols = config != null && config.getCols() != null ? config.getCols() : template.getCols();
+        Set<Integer> aisleColumns = config != null && config.getAisleColumns() != null ? 
+                new HashSet<>(config.getAisleColumns()) : Set.of(cols / 2);
+
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < cols; col++) {
+                // 통로 건너뛰기
+                if (aisleColumns.contains(col)) continue;
+
+                // 섹션 결정
+                int section = determineSectionByPosition(row, rows, config);
+                
+                // 좌석 타입 결정
+                SeatLayout.SeatType seatType = determineSeatTypeByPosition(row, rows, config);
+                
+                // 가격 결정
+                int price = determinePriceByType(seatType);
+                
+                // 좌석 라벨 생성
+                String label = String.valueOf((char)('A' + row)) + (col + 1);
+
+                SeatLayout seat = SeatLayout.builder()
+                        .venue(venue)
+                        .xPosition(col + 2) // 왼쪽 여백
+                        .yPosition(row + 4) // 무대 아래 여백
+                        .seatType(seatType)
+                        .sectionId(section)
+                        .seatLabel(label)
+                        .price(price)
+                        .isActive(true)
+                        .rowNumber(row + 1)
+                        .seatNumber(col + 1)
+                        .build();
+
+                seats.add(seat);
+            }
+        }
+
+        return seats;
+    }
+
+    /**
+     * 위치에 따른 섹션 결정
+     */
+    private int determineSectionByPosition(int row, int totalRows, SeatLayoutDTO.TemplateConfig config) {
+        if (row < totalRows * 0.3) {
+            return 1; // 앞쪽 - 프리미엄
+        } else if (row < totalRows * 0.7) {
+            return 2; // 중간 - 일반
+        } else {
+            return 3; // 뒤쪽 - 이코노미
+        }
+    }
+
+    /**
+     * 위치에 따른 좌석 타입 결정
+     */
+    private SeatLayout.SeatType determineSeatTypeByPosition(int row, int totalRows, SeatLayoutDTO.TemplateConfig config) {
+        if (config != null && config.getIncludeVipSection() != null && config.getIncludeVipSection() && row < 2) {
+            return SeatLayout.SeatType.VIP;
+        } else if (config != null && config.getIncludePremiumSection() != null && config.getIncludePremiumSection() && row < totalRows * 0.3) {
+            return SeatLayout.SeatType.PREMIUM;
+        } else {
+            return SeatLayout.SeatType.REGULAR;
+        }
+    }
+
+    /**
+     * 좌석 타입에 따른 가격 결정
+     */
+    private int determinePriceByType(SeatLayout.SeatType seatType) {
+        return switch (seatType) {
+            case VIP -> 100000;
+            case PREMIUM -> 75000;
+            case REGULAR -> 50000;
+            case WHEELCHAIR -> 50000;
+            case BLOCKED -> 0;
+            default -> 50000;
+        };
+    }
+
+    /**
+     * 섹션 정보 생성
+     */
+    private List<SeatLayoutDTO.SectionInfo> generateSectionInfo(List<SeatLayout> seatLayouts) {
+        Map<Integer, List<SeatLayout>> sectionMap = seatLayouts.stream()
+                .filter(seat -> seat.getSectionId() != null)
+                .collect(Collectors.groupingBy(SeatLayout::getSectionId));
+
+        List<SeatLayoutDTO.SectionInfo> sections = new ArrayList<>();
+        
+        // 기본 섹션 색상
+        String[] colors = {"#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FECA57"};
+        
+        for (Map.Entry<Integer, List<SeatLayout>> entry : sectionMap.entrySet()) {
+            Integer sectionId = entry.getKey();
+            List<SeatLayout> sectionSeats = entry.getValue();
+            
+            String sectionName = sectionId + "구역";
+            String sectionColor = colors[(sectionId - 1) % colors.length];
+            
+            int totalRevenue = sectionSeats.stream()
+                    .mapToInt(seat -> seat.getPrice() != null ? seat.getPrice() : 0)
+                    .sum();
+
+            sections.add(SeatLayoutDTO.SectionInfo.builder()
+                    .id(sectionId)
+                    .name(sectionName)
+                    .color(sectionColor)
+                    .seatCount(sectionSeats.size())
+                    .totalRevenue(totalRevenue)
+                    .build());
+        }
+
+        return sections;
+    }
+
+    /**
+     * 통계 생성
+     */
+    private SeatLayoutDTO.VenueStatistics generateStatistics(List<SeatLayout> seatLayouts) {
+        int totalSeats = seatLayouts.size();
+        int activeSeats = (int) seatLayouts.stream().filter(SeatLayout::getIsActive).count();
+        int totalRevenue = seatLayouts.stream().mapToInt(seat -> seat.getPrice() != null ? seat.getPrice() : 0).sum();
+
         Map<SeatLayout.SeatType, Long> typeCounts = seatLayouts.stream()
                 .collect(Collectors.groupingBy(SeatLayout::getSeatType, Collectors.counting()));
 
-        stats.setRegularSeats(typeCounts.getOrDefault(SeatLayout.SeatType.REGULAR, 0L).intValue());
-        stats.setVipSeats(typeCounts.getOrDefault(SeatLayout.SeatType.VIP, 0L).intValue());
-        stats.setPremiumSeats(typeCounts.getOrDefault(SeatLayout.SeatType.PREMIUM, 0L).intValue());
-        stats.setWheelchairSeats(typeCounts.getOrDefault(SeatLayout.SeatType.WHEELCHAIR, 0L).intValue());
-        stats.setBlockedSeats(typeCounts.getOrDefault(SeatLayout.SeatType.BLOCKED, 0L).intValue());
-        stats.setAisleSpaces(typeCounts.getOrDefault(SeatLayout.SeatType.AISLE, 0L).intValue());
-        stats.setStageAreas(typeCounts.getOrDefault(SeatLayout.SeatType.STAGE, 0L).intValue());
-
-        return stats;
+        return SeatLayoutDTO.VenueStatistics.builder()
+                .totalSeats(totalSeats)
+                .activeSeats(activeSeats)
+                .totalRevenue(totalRevenue)
+                .regularSeats(typeCounts.getOrDefault(SeatLayout.SeatType.REGULAR, 0L).intValue())
+                .vipSeats(typeCounts.getOrDefault(SeatLayout.SeatType.VIP, 0L).intValue())
+                .premiumSeats(typeCounts.getOrDefault(SeatLayout.SeatType.PREMIUM, 0L).intValue())
+                .wheelchairSeats(typeCounts.getOrDefault(SeatLayout.SeatType.WHEELCHAIR, 0L).intValue())
+                .blockedSeats(typeCounts.getOrDefault(SeatLayout.SeatType.BLOCKED, 0L).intValue())
+                .build();
     }
 }
