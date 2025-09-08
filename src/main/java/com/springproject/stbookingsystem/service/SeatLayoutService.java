@@ -29,40 +29,67 @@ public class SeatLayoutService {
     };
 
     // 템플릿 정의 (개선된 버전)
-    private static final Map<String, SeatLayoutDTO.TemplateInfo> TEMPLATES = Map.of(
-        "small_theater", SeatLayoutDTO.TemplateInfo.builder()
+    private static final Map<String, SeatLayoutDTO.TemplateInfo> TEMPLATES;
+    
+    static {
+        TEMPLATES = new HashMap<>();
+        TEMPLATES.put("small_theater", SeatLayoutDTO.TemplateInfo.builder()
             .name("small_theater")
             .displayName("소형 극장")
             .description("8행 6열의 아늑한 소형 극장 배치")
             .rows(8).cols(6).estimatedSeats(42)
             .category("theater")
             .isPopular(true)
-            .build(),
-        "medium_theater", SeatLayoutDTO.TemplateInfo.builder()
+            .build());
+        TEMPLATES.put("medium_theater", SeatLayoutDTO.TemplateInfo.builder()
             .name("medium_theater")
             .displayName("중형 극장")
             .description("12행 8열의 표준 중형 극장 배치")
             .rows(12).cols(8).estimatedSeats(84)
             .category("theater")
             .isPopular(true)
-            .build(),
-        "large_theater", SeatLayoutDTO.TemplateInfo.builder()
+            .build());
+        TEMPLATES.put("large_theater", SeatLayoutDTO.TemplateInfo.builder()
             .name("large_theater")
             .displayName("대형 극장")
             .description("16행 10열의 대형 극장 배치")
             .rows(16).cols(10).estimatedSeats(140)
             .category("theater")
             .isPopular(false)
-            .build(),
-        "concert_hall", SeatLayoutDTO.TemplateInfo.builder()
+            .build());
+        TEMPLATES.put("concert_hall", SeatLayoutDTO.TemplateInfo.builder()
             .name("concert_hall")
             .displayName("콘서트홀")
             .description("20행 12열의 대형 콘서트홀 배치")
             .rows(20).cols(12).estimatedSeats(210)
             .category("concert")
             .isPopular(true)
-            .build()
-    );
+            .build());
+        TEMPLATES.put("theater", SeatLayoutDTO.TemplateInfo.builder()
+            .name("theater")
+            .displayName("표준 극장")
+            .description("20행 30열의 표준 극장 배치")
+            .rows(20).cols(30).estimatedSeats(500)
+            .category("theater")
+            .isPopular(true)
+            .build());
+        TEMPLATES.put("classroom", SeatLayoutDTO.TemplateInfo.builder()
+            .name("classroom")
+            .displayName("강의실")
+            .description("10행 20열의 교육용 배치")
+            .rows(10).cols(20).estimatedSeats(180)
+            .category("education")
+            .isPopular(false)
+            .build());
+        TEMPLATES.put("stadium", SeatLayoutDTO.TemplateInfo.builder()
+            .name("stadium")
+            .displayName("스타디움")
+            .description("50행 60열의 대규모 경기장")
+            .rows(50).cols(60).estimatedSeats(2500)
+            .category("sports")
+            .isPopular(false)
+            .build());
+    }
 
     /**
      * 공연장 좌석 배치 조회 (통합 버전)
@@ -157,33 +184,66 @@ public class SeatLayoutService {
      */
     @Transactional
     public SeatLayoutDTO.VenueLayoutResponse applyTemplate(Long venueId, String templateName, SeatLayoutDTO.TemplateConfig config) {
-        log.info("템플릿 적용: venueId = {}, template = {}", venueId, templateName);
+        log.info("템플릿 적용: venueId = {}, template = {}, config = {}", venueId, templateName, config);
 
-        Venue venue = venueRepository.findById(venueId)
-                .orElseThrow(() -> new RuntimeException("공연장을 찾을 수 없습니다: " + venueId));
+        try {
+            // 1. Venue 존재 확인
+            Venue venue = venueRepository.findById(venueId)
+                    .orElseThrow(() -> {
+                        log.error("공연장을 찾을 수 없습니다: venueId = {}", venueId);
+                        return new RuntimeException("공연장을 찾을 수 없습니다: " + venueId);
+                    });
+            log.info("공연장 확인 완료: {}", venue.getName());
 
-        SeatLayoutDTO.TemplateInfo template = TEMPLATES.get(templateName);
-        if (template == null) {
-            throw new RuntimeException("존재하지 않는 템플릿입니다: " + templateName);
-        }
+            // 2. 템플릿 존재 확인
+            SeatLayoutDTO.TemplateInfo template = TEMPLATES.get(templateName);
+            if (template == null) {
+                log.error("존재하지 않는 템플릿입니다: {}, 사용 가능한 템플릿: {}", templateName, TEMPLATES.keySet());
+                throw new RuntimeException("존재하지 않는 템플릿입니다: " + templateName);
+            }
+            log.info("템플릿 확인 완료: {}", template.getDisplayName());
 
-        // 1. 먼저 해당 venue의 seatLayout을 참조하는 seats를 찾아서 seatLayout 참조를 null로 설정
-        List<SeatLayout> existingSeatLayouts = seatLayoutRepository.findByVenueOrderByIdAsc(venue);
-        for (SeatLayout seatLayout : existingSeatLayouts) {
-            seatLayoutRepository.clearSeatLayoutReferences(seatLayout.getId());
-        }
+            // 3. 기존 좌석 배치 삭제
+            log.info("기존 좌석 배치 삭제 시작");
+            List<SeatLayout> existingSeatLayouts = seatLayoutRepository.findByVenueOrderByIdAsc(venue);
+            log.info("기존 좌석 배치 개수: {}", existingSeatLayouts.size());
+            
+            for (SeatLayout seatLayout : existingSeatLayouts) {
+                try {
+                    seatLayoutRepository.clearSeatLayoutReferences(seatLayout.getId());
+                } catch (Exception e) {
+                    log.warn("좌석 참조 제거 오류: seatLayoutId = {}, error = {}", seatLayout.getId(), e.getMessage());
+                }
+            }
+            
+            try {
+                seatLayoutRepository.deleteByVenue(venue);
+                log.info("기존 좌석 배치 삭제 완료");
+            } catch (Exception e) {
+                log.error("기존 좌석 배치 삭제 실패", e);
+                throw new RuntimeException("기존 좌석 배치 삭제 실패: " + e.getMessage());
+            }
+
+            // 4. 템플릿에 따른 좌석 생성
+            log.info("템플릿 좌석 생성 시작");
+            List<SeatLayout> templateSeats = generateTemplateSeats(venue, template, config);
+            log.info("생성될 좌석 수: {}", templateSeats.size());
         
-        // 2. 기존 좌석 삭제
-        seatLayoutRepository.deleteByVenue(venue);
+            // 5. 저장
+            try {
+                List<SeatLayout> savedSeats = seatLayoutRepository.saveAll(templateSeats);
+                log.info("템플릿 적용 완료: {} 개 좌석 생성", savedSeats.size());
+            } catch (Exception e) {
+                log.error("템플릿 좌석 저장 실패", e);
+                throw new RuntimeException("템플릿 좌석 저장 실패: " + e.getMessage());
+            }
 
-        // 템플릿에 따른 좌석 생성
-        List<SeatLayout> templateSeats = generateTemplateSeats(venue, template, config);
-        
-        // 저장
-        List<SeatLayout> savedSeats = seatLayoutRepository.saveAll(templateSeats);
-        log.info("템플릿 적용 완료: {} 개 좌석 생성", savedSeats.size());
-
-        return getVenueLayout(venueId);
+            return getVenueLayout(venueId);
+            
+        } catch (Exception e) {
+            log.error("템플릿 적용 중 오류 발생: venueId = {}, template = {}", venueId, templateName, e);
+            throw e; // 원본 예외를 다시 던지기
+        }
     }
 
     /**
