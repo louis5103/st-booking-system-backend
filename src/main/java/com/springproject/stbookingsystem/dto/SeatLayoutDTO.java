@@ -340,6 +340,21 @@ public class SeatLayoutDTO {
         // 라벨은 label을 우선하고 없으면 seatLabel 사용
         String label = dto.getLabel() != null ? dto.getLabel() : dto.getSeatLabel();
         
+        // 좌표를 그리드 기반 행/열로 변환 (gridSize = 40 기준)
+        Integer gridSize = 40;
+        Integer rowNumber = yPos != null ? (yPos / gridSize) + 1 : 1;
+        Integer seatNumber = xPos != null ? (xPos / gridSize) + 1 : 1;
+        
+        // 중복을 방지하기 위해 좌표값을 추가로 고려
+        // 같은 그리드 셀 내에서도 유니크하게 만들기
+        if (xPos != null && yPos != null) {
+            int offsetX = xPos % gridSize;
+            int offsetY = yPos % gridSize;
+            // 오프셋을 이용해 동일 그리드 내에서 구분
+            seatNumber = seatNumber * 100 + offsetX;
+            rowNumber = rowNumber * 100 + offsetY;
+        }
+        
         return SeatLayout.builder()
                 .venue(venue)
                 .xPosition(xPos)
@@ -350,9 +365,9 @@ public class SeatLayoutDTO {
                 .price(dto.getPrice())
                 .isActive(dto.getIsActive() != null ? dto.getIsActive() : true)
                 .rotation(dto.getRotation() != null ? dto.getRotation() : 0)
-                // 기본값들 (필요한 경우)
-                .rowNumber(yPos != null ? yPos + 1 : 1)
-                .seatNumber(xPos != null ? xPos + 1 : 1)
+                // 계산된 행/열 번호
+                .rowNumber(rowNumber)
+                .seatNumber(seatNumber)
                 .build();
     }
 
