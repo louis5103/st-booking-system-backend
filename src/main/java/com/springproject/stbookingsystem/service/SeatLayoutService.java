@@ -115,7 +115,14 @@ public class SeatLayoutService {
         Venue venue = venueRepository.findById(venueId)
                 .orElseThrow(() -> new RuntimeException("공연장을 찾을 수 없습니다: " + venueId));
 
-        // 기존 좌석 삭제
+        // 1. 먼저 해당 venue의 seatLayout을 참조하는 seats를 찾아서 seatLayout 참조를 null로 설정
+        List<SeatLayout> existingSeatLayouts = seatLayoutRepository.findByVenueOrderByIdAsc(venue);
+        for (SeatLayout seatLayout : existingSeatLayouts) {
+            // seats 테이블에서 해당 seatLayout을 참조하는 레코드들의 seat_layout_id를 null로 설정
+            seatLayoutRepository.clearSeatLayoutReferences(seatLayout.getId());
+        }
+        
+        // 2. 이제 외래키 제약조건 없이 기존 좌석 배치 삭제 가능
         seatLayoutRepository.deleteByVenue(venue);
 
         // 새 좌석 생성
@@ -160,7 +167,13 @@ public class SeatLayoutService {
             throw new RuntimeException("존재하지 않는 템플릿입니다: " + templateName);
         }
 
-        // 기존 좌석 삭제
+        // 1. 먼저 해당 venue의 seatLayout을 참조하는 seats를 찾아서 seatLayout 참조를 null로 설정
+        List<SeatLayout> existingSeatLayouts = seatLayoutRepository.findByVenueOrderByIdAsc(venue);
+        for (SeatLayout seatLayout : existingSeatLayouts) {
+            seatLayoutRepository.clearSeatLayoutReferences(seatLayout.getId());
+        }
+        
+        // 2. 기존 좌석 삭제
         seatLayoutRepository.deleteByVenue(venue);
 
         // 템플릿에 따른 좌석 생성
@@ -183,6 +196,13 @@ public class SeatLayoutService {
         Venue venue = venueRepository.findById(venueId)
                 .orElseThrow(() -> new RuntimeException("공연장을 찾을 수 없습니다: " + venueId));
 
+        // 1. 먼저 해당 venue의 seatLayout을 참조하는 seats를 찾아서 seatLayout 참조를 null로 설정
+        List<SeatLayout> existingSeatLayouts = seatLayoutRepository.findByVenueOrderByIdAsc(venue);
+        for (SeatLayout seatLayout : existingSeatLayouts) {
+            seatLayoutRepository.clearSeatLayoutReferences(seatLayout.getId());
+        }
+        
+        // 2. 기존 좌석 배치 삭제
         seatLayoutRepository.deleteByVenue(venue);
         log.info("좌석 배치 초기화 완료");
     }

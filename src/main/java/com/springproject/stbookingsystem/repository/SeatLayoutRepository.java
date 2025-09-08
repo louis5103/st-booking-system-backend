@@ -153,4 +153,11 @@ public interface SeatLayoutRepository extends JpaRepository<SeatLayout, Long> {
      */
     @Query("SELECT sl FROM SeatLayout sl WHERE sl.venue = :venue ORDER BY sl.sectionId ASC, sl.seatLabel ASC")
     List<SeatLayout> findByVenueOrderBySectionIdAscSeatLabelAsc(@Param("venue") Venue venue);
+
+    /**
+     * seats 테이블에서 특정 seatLayout을 참조하는 레코드들의 seat_layout_id를 null로 설정
+     */
+    @Modifying
+    @Query("UPDATE Seat s SET s.seatLayout = null WHERE s.seatLayout.id = :seatLayoutId")
+    void clearSeatLayoutReferences(@Param("seatLayoutId") Long seatLayoutId);
 }
